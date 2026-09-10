@@ -5,11 +5,11 @@ en:{branches:'Five branches',cart:'Cart',heroKicker:'NEW • FISH FILLET',heroTi
 I18N.ar.add='اطلب';
 I18N.en.add='Order';
 const branches=[
-{id:'dubai',ar:'دبي',en:'Dubai',phone:'971528666619',display:'052 866 6619',map:'https://maps.app.goo.gl/TgLsfQvtVpJHdTkt8?g_st=ic'},
-{id:'majaz',ar:'المجاز 1',en:'Al Majaz 1',phone:'971555570560',display:'055 557 0560',map:'https://maps.app.goo.gl/uVXgZeUQVsB3db3t8?g_st=ic'},
-{id:'taawun',ar:'الشارقة - التعاون',en:'Sharjah - Al Taawun',phone:'971564087870',display:'056 408 7870',map:'https://maps.google.com/?q=25.309641,55.372841'},
-{id:'marsa',ar:'عجمان - مرسى عجمان',en:'Ajman - Marsa Ajman',phone:'971564088288',display:'056 408 8288',map:'https://maps.google.com/?q=25.421204,55.443203'},
-{id:'khalifa',ar:'عجمان - شارع خليفة',en:'Ajman - Khalifa Street',phone:'971554505712',display:'055 450 5712',map:'https://maps.app.goo.gl/QiVmUfQxMzwx8WG16?g_st=awb'}];
+{id:'dubai',ar:'دبي',en:'Dubai',phone:'971528666619',display:'052 866 6619',map:'https://maps.app.goo.gl/TgLsfQvtVpJHdTkt8?g_st=ic',image:'./assets/22888E61-CD79-4A88-8331-C645F2A51D19.jpeg'},
+{id:'majaz',ar:'المجاز 1',en:'Al Majaz 1',phone:'971555570560',display:'055 557 0560',map:'https://maps.app.goo.gl/uVXgZeUQVsB3db3t8?g_st=ic',image:'./assets/9365F25D-E46B-4D15-B960-13B8687FF442.jpeg'},
+{id:'taawun',ar:'الشارقة - التعاون',en:'Sharjah - Al Taawun',phone:'971564087870',display:'056 408 7870',map:'https://maps.google.com/?q=25.309641,55.372841',image:'./assets/FB90EFC4-1724-44C3-9C61-CB450C6E5B1D.jpeg'},
+{id:'marsa',ar:'عجمان - مرسى عجمان',en:'Ajman - Marsa Ajman',phone:'971564088288',display:'056 408 8288',map:'https://maps.google.com/?q=25.421204,55.443203',image:'./assets/E3C38290-F4AD-4C63-BF34-58D4367DFD34.jpeg'},
+{id:'khalifa',ar:'عجمان - شارع خليفة',en:'Ajman - Khalifa Street',phone:'971554505712',display:'055 450 5712',map:'https://maps.app.goo.gl/QiVmUfQxMzwx8WG16?g_st=awb',image:'./assets/D4BE2B6E-7B80-4CB8-AE94-FAD67DA21D14.jpeg'}];
 const products=[
 {id:'spicy-broasted',ar:'بروستد حار – ٤ قطع',en:'Spicy Broasted – 4 Pieces',arDesc:'بطاطا، خبز، مخلل، كريم توم حار، كولسلو وكاتشب',enDesc:'Fries, bread, pickles, spicy garlic cream, coleslaw and ketchup',price:32,cat:'meals',tag:'SPICY',image:'https://chicken-dubai-clone.lovable.app/assets/spicy-broasted.webp'},
 {id:'cheddar-jalapeno-fries',ar:'بطاطا مع جبنة شيدر وهالبينو',en:'Cheddar Jalapeño Fries',arDesc:'بطاطا، جبنة شيدر، هالبينو، كريم توم، مخلل وكاتشب',enDesc:'Fries, cheddar cheese, jalapeño, garlic cream, pickles and ketchup',price:22,cat:'extras',tag:'LOADED',image:'https://chicken-dubai-clone.lovable.app/assets/cheddar-jalapeno-fries.webp'},
