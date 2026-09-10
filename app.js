@@ -44,7 +44,7 @@ const products=[
 {id:'dynamite-sauce',ar:'صوص دايناميت',en:'Dynamite Sauce',arDesc:'صوص كريمي بنكهة حارة',enDesc:'Creamy sauce with a spicy kick',price:3,cat:'extras',tag:'SPICY',image:'https://chicken-dubai-clone.lovable.app/assets/dynamite-sauce.webp'},
 {id:'cheddar-sauce',ar:'جبنة شيدر',en:'Cheddar Cheese',arDesc:'صوص جبنة شيدر كريمي',enDesc:'Creamy cheddar cheese sauce',price:3,cat:'extras',tag:'CHEESY',image:'https://chicken-dubai-clone.lovable.app/assets/cheddar-sauce.webp'},
 {id:'cocktail-sauce',ar:'صوص كوكتيل',en:'Cocktail Sauce',arDesc:'صوص كوكتيل كريمي',enDesc:'Creamy cocktail sauce',price:3,cat:'extras',tag:'SAUCE',image:'https://chicken-dubai-clone.lovable.app/assets/cocktail-sauce.webp'},
-{id:'garlic',ar:'كريم توم',en:'Garlic Cream',arDesc:'صوص ثوم كريمي',enDesc:'Creamy garlic sauce',price:4,cat:'extras',tag:'PAIR IT',image:'https://raw.githubusercontent.com/balmyoutlet-prog/afandi-chicken-dubai/main/assets/garlic-cream.png'},
+{id:'garlic',ar:'كريم توم',en:'Garlic Cream',arDesc:'صوص ثوم كريمي',enDesc:'Creamy garlic sauce',price:4,cat:'extras',tag:'PAIR IT',image:'./assets/garlic-cream.png'},
 {id:'coleslaw',ar:'كولسلو',en:'Coleslaw',arDesc:'طازج وكريمي',enDesc:'Fresh and creamy',price:6,cat:'extras',tag:'FRESH'},
 
 {id:'water',ar:'مياه',en:'Water',arDesc:'مياه شرب معبأة',enDesc:'Bottled drinking water',price:3,cat:'drinks',tag:'COLD',image:'https://chicken-dubai-clone.lovable.app/assets/water.png'},
