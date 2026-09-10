@@ -145,3 +145,12 @@ body{padding-bottom:78px}
 .branch-preview-copy h3{margin:3px 0;font-size:18px}.branch-preview-copy p{margin:0 0 8px;color:var(--muted);font-weight:700}
 .branch-preview-copy a{display:inline-flex;background:var(--red);color:#fff;text-decoration:none;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:900}
 @media(max-width:620px){.cs-rail{display:grid;grid-template-columns:repeat(4,minmax(96px,1fr));overflow-x:auto}.branch-preview{grid-template-columns:105px 1fr}.branch-preview-media{width:105px}.branch-preview-copy a{padding:8px 10px}}
+
+/* Fulfilment-specific checkout fields */
+.delivery-address{display:grid;gap:7px;margin:2px 0 14px}
+.delivery-address[hidden],.delivery-fee-row[hidden]{display:none!important}
+.delivery-address span{font-weight:900;font-size:14px}
+.delivery-address textarea{width:100%;resize:vertical;min-height:82px;border:1.5px solid var(--line);border-radius:15px;padding:12px 14px;font:inherit;background:#fff;outline:none}
+.delivery-address textarea:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(190,0,22,.09)}
+.delivery-fee-row{display:flex;align-items:center;justify-content:space-between;background:#fff4f4;border:1px solid #ffd3d8;border-radius:14px;padding:10px 13px;margin:4px 0 8px;font-size:13px;font-weight:900}
+.delivery-fee-row strong{color:var(--red)}
