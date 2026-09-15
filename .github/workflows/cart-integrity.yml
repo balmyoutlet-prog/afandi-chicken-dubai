@@ -1,0 +1,106 @@
+name: Cart integrity and explicit add verification
+on:
+  push:
+    branches: [fix/upsell-cart-integrity-20260915, main]
+    paths: ['cart-integrity.js', 'scripts/prepare-cart-integrity.py', 'scripts/e2e-cart-integrity.cjs', '.github/workflows/cart-integrity.yml', 'app.js', 'reliability.js', 'index.html']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: cart-integrity-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepare narrowly scoped integration
+        if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
+        run: |
+          python scripts/prepare-cart-integrity.py
+          # Fish is outside the first eight checkout meal recommendations; water is present.
+          sed -i 's/data-merch-view=fish/data-merch-view=water/g' scripts/e2e-cart-integrity.cjs
+      - name: Install isolated browser test tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2
+          npx playwright install --with-deps chromium webkit
+      - name: Syntax checks
+        run: |
+          node --check app.js
+          node --check reliability.js
+          node --check checkout-rails.js
+          node --check cart-integrity.js
+          node --check scripts/e2e-cart-integrity.cjs
+      - name: Verify every product and calculation before publishing
+        if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
+        run: |
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/afandi-cart-server.log 2>&1 &
+          node scripts/e2e-cart-integrity.cjs
+          node scripts/e2e-reliability.cjs
+          node scripts/e2e-checkout-rails.cjs
+      - name: Commit only browser-tested integration to the feature branch
+        if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html app.js reliability.js scripts/e2e-cart-integrity.cjs
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: activate browser-tested cart buttons, summaries and receipt arithmetic'
+            git push origin HEAD:fix/upsell-cart-integrity-20260915
+          fi
+      - name: Wait for exact public release
+        if: github.ref_name == 'main'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import hashlib,time
+          files={'cart-integrity.js':'20260915r1','app.js':'20260915-cart-integrity1','reliability.js':'20260915-cart-integrity1'}
+          expected={name:hashlib.sha256(Path(name).read_bytes()).hexdigest() for name in files}
+          for attempt in range(60):
+              try:
+                  with urlopen('https://alafandichicken.com/',timeout=15) as r:
+                      ready='cart-integrity.js?v=20260915r1' in r.read().decode()
+                  for name,version in files.items():
+                      with urlopen('https://alafandichicken.com/'+name+'?v='+version,timeout=15) as r:
+                          ready=ready and hashlib.sha256(r.read()).hexdigest()==expected[name]
+                  if ready:
+                      print('EXACT_PUBLIC_CART_RELEASE_CONFIRMED')
+                      break
+              except Exception:
+                  pass
+              time.sleep(5)
+          else:
+              raise SystemExit('Expected release not live: do not claim production success')
+          PY
+      - name: Verify real public site in Chromium and WebKit without sending orders
+        if: github.ref_name == 'main'
+        env:
+          AUDIT_BASE: https://alafandichicken.com
+        run: node scripts/e2e-cart-integrity.cjs
+      - name: Summarize audit
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json,os
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as out:
+              for p in Path('audit-results').glob('cart-integrity-*.json'):
+                  report=json.loads(p.read_text())
+                  out.write('## '+p.name+'\n\n')
+                  out.write('Base: '+report['base']+'\n\n')
+                  out.write('Real messages sent: 0 (WhatsApp navigations intercepted).\n\n')
+                  for test in report['tests']:
+                      out.write(str(test)+'\n\n')
+                  for failure in report['failures']:
+                      out.write(str(failure)+'\n\n')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cart-integrity-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 7
