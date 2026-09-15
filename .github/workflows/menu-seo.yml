@@ -1,0 +1,68 @@
+name: Bilingual menu SEO verification
+on:
+  push:
+    branches: [feat/afandi-menu-seo, main]
+    paths: [scripts/seo-build.mjs, app.js, .github/workflows/menu-seo.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: menu-seo-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: Build crawlable pages from current menu
+        run: |
+          node scripts/seo-build.mjs
+          cat > seo-entry.js <<'JS'
+          /* Open the requested dish; never add anything without a customer click. */
+          (()=>{const p=new URLSearchParams(location.search),id=p.get('item'),language=p.get('lang');if(!id||!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)||!products.some(x=>x.id===id))return;if(['ar','en'].includes(language))applyLanguage(language,false);if(document.querySelector('#languageGate').open)document.querySelector('#languageGate').close();openQuickView(id);})();
+          JS
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html');h=p.read_text()
+          if '/seo-entry.js' not in h:h=h.replace('</body>','<script src="/seo-entry.js?v=1" defer></script></body>')
+          if 'id="fullMenuLinks"' not in h:h=h.replace('</main>','<section class="social-strip" id="fullMenuLinks"><a href="/menu/">Full menu &amp; item details</a> · <a href="/ar/menu/">المنيو وتفاصيل الأصناف</a></section></main>')
+          assert 'info@alafandichicken.com' in h
+          p.write_text(h)
+          PY
+          node --check seo-entry.js
+      - name: Validate all metadata and actual prices
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+          const c={};vm.runInNewContext(fs.readFileSync('app.js','utf8').split('const $=')[0]+';globalThis.items=products',c);let checked=0;
+          for(const p of c.items)for(const l of ['en','ar']){const pathname=(l==='ar'?'ar/':'')+'menu/'+p.id+'/index.html',h=fs.readFileSync(pathname,'utf8');const data=[...h.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(m=>JSON.parse(m[1]));assert.equal(data[0].name,p[l]);assert.equal(data[0].offers.price,Number(p.price).toFixed(2));assert.equal(data[0].offers.priceCurrency,'AED');assert.ok(h.includes('rel="canonical"'));assert.equal((h.match(/hreflang=/g)||[]).length,3);assert.ok(h.includes('?item='+p.id));assert.ok(!h.includes('aggregateRating'));assert.ok(!h.includes('lovable.app'));checked++;}
+          const sitemap=fs.readFileSync('sitemap.xml','utf8');assert.equal((sitemap.match(/<loc>/g)||[]).length,checked+3);fs.mkdirSync('seo-evidence',{recursive:true});fs.writeFileSync('seo-evidence/metadata.json',JSON.stringify({passed:true,items:c.items.length,dish_pages:checked,menu_indexes:2,sitemap_urls:checked+3},null,2));
+          JS
+      - name: Install isolated browser test dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Browser checks with analytics and external orders blocked
+        run: |
+          cat > /tmp/seo-check.cjs <<'JS'
+          const fs=require('fs'),http=require('http'),path=require('path'),assert=require('node:assert/strict');const{chromium,webkit}=require(process.cwd()+'/node_modules/playwright');
+          const root=process.cwd(),server=http.createServer((req,res)=>{const u=new URL(req.url,'http://localhost'),name=u.pathname.endsWith('/')?u.pathname+'index.html':u.pathname,f=path.resolve(root,'.'+name);if(!f.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}try{const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.webp':'image/webp','.jpeg':'image/jpeg','.png':'image/png','.ico':'image/x-icon'},data=fs.readFileSync(f);res.writeHead(200,{'Content-Type':types[path.extname(f)]||'application/octet-stream'});res.end(data);}catch{res.writeHead(404);res.end();}});
+          (async()=>{await new Promise(r=>server.listen(3200,'127.0.0.1',r));const results=[];for(const[name,engine]of[['chromium',chromium],['webkit',webkit]]){const b=await engine.launch(),c=await b.newContext({viewport:{width:390,height:844},isMobile:true}),p=await c.newPage(),errors=[];await c.route('**/*',r=>{const u=new URL(r.request().url());if(u.hostname!=='127.0.0.1'||u.pathname.startsWith('/_vercel/')||r.request().method()!=='GET')return r.fulfill({status:204,body:''});return r.continue();});p.on('pageerror',e=>errors.push(e.message));for(const prefix of['/menu/','/ar/menu/']){await p.goto('http://127.0.0.1:3200'+prefix+'water/');assert.equal(await p.locator('h1').textContent(),prefix.startsWith('/ar')?'مياه':'Water');assert.equal(await p.locator('.price').textContent(),'AED 3.00');await p.screenshot({path:'seo-evidence/'+name+(prefix.startsWith('/ar')?'-ar':'-en')+'.png',fullPage:true});await p.locator('a.order').click();await p.locator('#quickView[open]').waitFor();assert.equal(await p.locator('#qvName').textContent(),prefix.startsWith('/ar')?'مياه':'Water');assert.equal(await p.locator('#cartCount').textContent(),'0');await p.locator('#qvClose').click();await p.locator('a[href="/menu/"]').click();assert.equal(await p.locator('.items .item').count(),45);}assert.deepEqual(errors,[]);results.push({browser:name,passed:true,checks:['English and Arabic product pages','Exact AED price','Exact dish opens for ordering','No automatic additions','All 45 crawlable menu links','No JS errors'],live_orders:0,analytics_events:0});await b.close();}fs.writeFileSync('seo-evidence/browsers.json',JSON.stringify(results,null,2));})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>server.close());
+          JS
+          node /tmp/seo-check.cjs
+      - name: Save tested pages to the current branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add menu ar/menu sitemap.xml robots.txt menu-pages.css seo-entry.js index.html
+          git diff --cached --quiet || git commit -m 'feat: publish verified bilingual SEO pages for every menu item'
+          git push origin HEAD:${{ github.ref_name }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afandi-menu-seo-verification
+          path: seo-evidence/
+          retention-days: 7
