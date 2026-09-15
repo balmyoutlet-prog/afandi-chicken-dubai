@@ -2,7 +2,7 @@ name: Cart integrity and explicit add verification
 on:
   push:
     branches: [fix/upsell-cart-integrity-20260915, main]
-    paths: ['cart-integrity.js', 'scripts/prepare-cart-integrity.py', 'scripts/e2e-cart-integrity.cjs', '.github/workflows/cart-integrity.yml', 'app.js', 'reliability.js', 'index.html']
+    paths: ['cart-integrity.js', 'scripts/prepare-cart-integrity.py', 'scripts/adapt-cart-delivery.py', 'scripts/e2e-cart-integrity.cjs', '.github/workflows/cart-integrity.yml', 'app.js', 'reliability.js', 'index.html']
   workflow_dispatch:
 permissions:
   contents: write
@@ -12,17 +12,25 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    env:
+      PW_TEST_SCREENSHOT_NO_FONTS_READY: '1'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Preserve latest main changes on the feature branch
+        if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git merge --no-edit origin/main
       - name: Prepare narrowly scoped integration
         if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
         run: |
           python scripts/prepare-cart-integrity.py
-          # Fish is outside the first eight checkout meal recommendations; water is present.
-          sed -i 's/data-merch-view=fish/data-merch-view=water/g' scripts/e2e-cart-integrity.cjs
+          python scripts/adapt-cart-delivery.py
       - name: Install isolated browser test tools
         run: |
           npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2
@@ -34,6 +42,7 @@ jobs:
           node --check checkout-rails.js
           node --check cart-integrity.js
           node --check scripts/e2e-cart-integrity.cjs
+          node scripts/test-delivery-pricing.cjs
       - name: Verify every product and calculation before publishing
         if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
         run: |
@@ -41,16 +50,16 @@ jobs:
           node scripts/e2e-cart-integrity.cjs
           node scripts/e2e-reliability.cjs
           node scripts/e2e-checkout-rails.cjs
+          node scripts/e2e-distance-delivery.cjs
       - name: Commit only browser-tested integration to the feature branch
         if: github.ref_name == 'fix/upsell-cart-integrity-20260915'
         run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html app.js reliability.js scripts/e2e-cart-integrity.cjs
+          git add index.html app.js reliability.js cart-integrity.js scripts/e2e-cart-integrity.cjs
           if ! git diff --cached --quiet; then
-            git commit -m 'fix: activate browser-tested cart buttons, summaries and receipt arithmetic'
-            git push origin HEAD:fix/upsell-cart-integrity-20260915
+            git commit -m 'fix: activate browser-tested add buttons, exact summaries and distance-delivery receipts'
           fi
+          git push origin HEAD:fix/upsell-cart-integrity-20260915
+          git rev-parse HEAD
       - name: Wait for exact public release
         if: github.ref_name == 'main'
         run: |
@@ -90,13 +99,10 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as out:
               for p in Path('audit-results').glob('cart-integrity-*.json'):
                   report=json.loads(p.read_text())
-                  out.write('## '+p.name+'\n\n')
-                  out.write('Base: '+report['base']+'\n\n')
+                  out.write('## '+p.name+'\n\nBase: '+report['base']+'\n\n')
                   out.write('Real messages sent: 0 (WhatsApp navigations intercepted).\n\n')
-                  for test in report['tests']:
-                      out.write(str(test)+'\n\n')
-                  for failure in report['failures']:
-                      out.write(str(failure)+'\n\n')
+                  for test in report['tests']: out.write(str(test)+'\n\n')
+                  for failure in report['failures']: out.write(str(failure)+'\n\n')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
