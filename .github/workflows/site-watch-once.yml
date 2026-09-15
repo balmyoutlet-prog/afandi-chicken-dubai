@@ -1,0 +1,73 @@
+name: Afandi production site watch
+on:
+  push:
+    branches: [audit/site-watch-20260915-1549]
+    paths: ['.github/workflows/site-watch-once.yml']
+permissions:
+  contents: read
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install browser audit tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2 lighthouse@13.4.1 chrome-launcher@1.0.0
+          npx playwright install --with-deps chromium webkit
+      - name: DNS-independent HTTP HTTPS TLS headers and key assets
+        run: |
+          mkdir -p audit-results
+          python - <<'PY'
+          import json,re,ssl,socket,time
+          from urllib.request import Request,urlopen
+          from urllib.parse import urljoin,urlparse
+          out={'urls':[],'certificates':[],'assets':[]}
+          uas={'User-Agent':'Mozilla/5.0 Afandi-Authorized-Site-Watch'}
+          for url in ['http://alafandichicken.com','https://alafandichicken.com','http://www.alafandichicken.com','https://www.alafandichicken.com']:
+              start=time.monotonic()
+              try:
+                  with urlopen(Request(url,headers=uas),timeout=20) as r:
+                      body=r.read(2000000)
+                      out['urls'].append({'url':url,'final_url':r.url,'status':r.status,'elapsed_ms':round((time.monotonic()-start)*1000),'headers':dict(r.headers),'bytes':len(body)})
+              except Exception as e: out['urls'].append({'url':url,'error':repr(e)})
+          for domain in ['alafandichicken.com','www.alafandichicken.com']:
+              try:
+                  with socket.create_connection((domain,443),timeout=15) as s:
+                      with ssl.create_default_context().wrap_socket(s,server_hostname=domain) as tls:
+                          c=tls.getpeercert();out['certificates'].append({'domain':domain,'verified':True,'tls':tls.version(),'expires':c.get('notAfter'),'san':c.get('subjectAltName')})
+              except Exception as e: out['certificates'].append({'domain':domain,'verified':False,'error':repr(e)})
+          with urlopen(Request('https://alafandichicken.com',headers=uas),timeout=20) as r: html=r.read().decode('utf-8','replace')
+          refs=[]
+          for ref in re.findall(r'''(?:src|href)=["']([^"']+)["']''',html):
+              u=urljoin('https://alafandichicken.com/',ref)
+              if urlparse(u).netloc in ['alafandichicken.com','www.alafandichicken.com'] and u not in refs: refs.append(u)
+          for u in refs[:80]:
+              start=time.monotonic()
+              try:
+                  with urlopen(Request(u,headers=uas),timeout=20) as r:
+                      data=r.read(5000000);out['assets'].append({'url':u,'status':r.status,'bytes':len(data),'content_type':r.headers.get('Content-Type'),'elapsed_ms':round((time.monotonic()-start)*1000)})
+              except Exception as e:out['assets'].append({'url':u,'error':repr(e)})
+          open('audit-results/network.json','w').write(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          assert all(x.get('status')==200 and x.get('final_url','').startswith('https://') for x in out['urls']), out['urls']
+          assert all(x.get('verified') for x in out['certificates']), out['certificates']
+          assert all(x.get('status')==200 for x in out['assets']), [x for x in out['assets'] if x.get('status')!=200]
+          PY
+      - name: Live customer journey no real WhatsApp sends
+        env:
+          AUDIT_BASE: https://alafandichicken.com
+        run: |
+          node --check app.js
+          node --check reliability.js
+          node --check checkout-rails.js
+          node scripts/e2e-reliability.cjs
+          node scripts/e2e-checkout-rails.cjs
+      - name: Live Lighthouse performance
+        run: node scripts/lighthouse-audit.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afandi-site-watch-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 7
