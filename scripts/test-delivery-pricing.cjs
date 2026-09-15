@@ -1,0 +1,14 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const P=require('../delivery-pricing.js');
+for(const [km,fee] of [[0,5],[0.5,5],[4.999999,5],[5,5],[5.000001,10],[7.5,10],[9.999999,10],[10,10],[10.000001,15],[12,15],[15,15],[15.000001,15],[20,15],[100,15]])test(`${km} km = AED ${fee}`,()=>assert.equal(P.feeForDistanceKm(km),fee));
+test('invalid distances never produce a fabricated fee',()=>{for(const n of [-1,NaN,Infinity,null,undefined,'5'])assert.throws(()=>P.feeForDistanceKm(n),RangeError)});
+test('geographic radius distance',()=>{assert.equal(P.distanceKm(P.branchPins.dubai,P.branchPins.dubai),0);assert(Math.abs(P.distanceKm({lat:0,lng:0},{lat:1,lng:0})-111.1950802335)<1e-6)});
+test('all five exact owner-confirmed branch pins are usable and nearest to themselves',()=>{assert.equal(Object.keys(P.branchPins).length,5);for(const b of Object.values(P.branchPins)){const q=P.quote({mode:'Delivery',customer:b,branch:b});assert.equal(q.feeAED,5);assert.equal(q.branchId,b.id);assert.equal(P.nearestBranch(b).branch.id,b.id)}});
+test('unknown coordinates and unverified branch cannot produce a fee',()=>{assert.equal(P.quote({mode:'Delivery'}).feeAED,null);assert.equal(P.quote({mode:'Delivery',customer:P.branchPins.dubai,branch:{...P.branchPins.dubai,verified:false}}).feeAED,null)});
+test('pickup/dine-in have no location requirement and no delivery fee',()=>{for(const mode of ['Takeaway','Dine-in'])assert.equal(P.quote({mode}).feeAED,0)});
+test('nearest branch is never guessed from incomplete pins',()=>assert.equal(P.nearestBranch(P.branchPins.dubai,[P.branchPins.dubai,{id:'unknown'}]).branch,null));
+test('parse decimal and Arabic coordinates',()=>{assert.deepEqual(P.parsePoint('25.21558,55.31718'),{lat:25.21558,lng:55.31718});assert.deepEqual(P.parsePoint('٢٥.٢١٥٥٨،٥٥.٣١٧١٨'),{lat:25.21558,lng:55.31718})});
+test('parse Google Maps coordinates and prefer pin over camera',()=>{assert.deepEqual(P.parsePoint('https://maps.google.com/?q=25.21558,55.31718'),{lat:25.21558,lng:55.31718});assert.deepEqual(P.parsePoint('https://www.google.com/maps/place/Test/@24,54,12z/data=!3d25.21558!4d55.31718'),{lat:25.21558,lng:55.31718})});
+test('reject arbitrary URLs, short links without coordinates, camera-only links and invalid points',()=>{for(const s of ['','abc','91,55','25,181','25,NaN','javascript:alert(1)','https://evil.example/?q=25,55','https://www.google.com.evil.example/?q=25,55','https://maps.app.goo.gl/short','https://www.google.com/maps/@25,55,15z'])assert.equal(P.parsePoint(s),null,s)});
+test('same selected branch determines both fee and quote identity',()=>{const q=P.quote({mode:'Delivery',customer:P.branchPins.dubai,branch:P.branchPins.khalifa});assert.equal(q.branchId,'khalifa');assert(q.distanceKm>15);assert.equal(q.feeAED,15)});
