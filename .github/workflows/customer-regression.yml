@@ -2,7 +2,7 @@ name: Customer insights isolated regression
 on:
   push:
     branches: [codex/afandi-admin-analytics]
-    paths: [.github/workflows/customer-regression.yml]
+    paths: [.github/workflows/customer-regression.yml, scripts/customer-integrate.py, tests/customer-addon.py, tests/insights-unit.mjs]
   workflow_dispatch:
 permissions:
   contents: write
@@ -20,9 +20,9 @@ jobs:
       - name: Integrate idempotently and validate source
         run: |
           python scripts/customer-integrate.py
-          sha256sum index.html admin/index.html afandi-client.js build.mjs vercel.json > /tmp/integration-before
+          sha256sum index.html admin/index.html afandi-client.js customer-behavior.js build.mjs vercel.json > /tmp/integration-before
           python scripts/customer-integrate.py
-          sha256sum index.html admin/index.html afandi-client.js build.mjs vercel.json > /tmp/integration-after
+          sha256sum index.html admin/index.html afandi-client.js customer-behavior.js build.mjs vercel.json > /tmp/integration-after
           cmp /tmp/integration-before /tmp/integration-after
           node --check customer-behavior.js
           node --check admin/customers.js
@@ -46,7 +46,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html admin/index.html afandi-client.js build.mjs vercel.json
+          git add index.html admin/index.html afandi-client.js customer-behavior.js build.mjs vercel.json
           git diff --cached --quiet || git commit -m 'feat: integrate tested customer analytics and opt-in repeat-order UI'
           git push origin HEAD:codex/afandi-admin-analytics
       - uses: actions/upload-artifact@v4
