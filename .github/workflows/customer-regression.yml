@@ -1,0 +1,57 @@
+name: Customer insights isolated regression
+on:
+  push:
+    branches: [codex/afandi-admin-analytics]
+    paths: [.github/workflows/customer-regression.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: afandi-customer-regression
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/afandi-admin-analytics
+      - name: Integrate idempotently and validate source
+        run: |
+          python scripts/customer-integrate.py
+          sha256sum index.html admin/index.html afandi-client.js build.mjs vercel.json > /tmp/integration-before
+          python scripts/customer-integrate.py
+          sha256sum index.html admin/index.html afandi-client.js build.mjs vercel.json > /tmp/integration-after
+          cmp /tmp/integration-before /tmp/integration-after
+          node --check customer-behavior.js
+          node --check admin/customers.js
+          node --check backend/insights.mjs
+          node --check afandi-client.js
+          node tests/insights-unit.mjs
+          node build.mjs
+          test -f dist/customer-behavior.js
+          test -f dist/admin/customers.js
+          test ! -e dist/backend
+          test ! -e dist/tests
+      - name: Install isolated browser test tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Test customer and admin flows without production access
+        run: |
+          python tests/customer-addon.py
+          node tests/customer-regression.generated.cjs
+      - name: Save tested integration to the draft branch only
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html admin/index.html afandi-client.js build.mjs vercel.json
+          git diff --cached --quiet || git commit -m 'feat: integrate tested customer analytics and opt-in repeat-order UI'
+          git push origin HEAD:codex/afandi-admin-analytics
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afandi-customer-insights-verification
+          path: audit-results/
+          retention-days: 7
