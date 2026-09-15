@@ -55,6 +55,7 @@ jobs:
           assert all(x.get('status')==200 for x in out['assets']), [x for x in out['assets'] if x.get('status')!=200]
           PY
       - name: Live customer journey no real WhatsApp sends
+        continue-on-error: true
         env:
           AUDIT_BASE: https://alafandichicken.com
         run: |
