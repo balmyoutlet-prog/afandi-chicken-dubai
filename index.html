@@ -18,7 +18,19 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;600;700;800&family=Oswald:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="./affandi.css?v=20260911e">
 <link rel="stylesheet" href="./reliability.css?v=20260915">
-<link rel="stylesheet" href="./checkout-rails.css?v=20260915r1">
+<style id="afandi-mobile-hero-fix">
+@media(max-width:560px){
+  .hero{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr)}
+  .hero-copy,.hero-visual{min-width:0}
+  .hero-copy{z-index:3}
+  .hero-visual{z-index:2}
+  .hero-actions{flex-wrap:wrap;justify-content:center;gap:6px}
+  .hero .primary{white-space:nowrap;gap:6px;padding:9px 10px}
+  .hero .primary strong{margin-inline-start:0;padding-inline-start:8px;font-size:16px}
+  .hero-cart{min-height:36px}
+  .hero-visual img{width:100%}
+}
+</style>
 </head><body><dialog id="languageGate" class="language-gate"><div class="language-card"><img decoding="async" src="/assets/menu/affandi-logo.jpeg" alt="Al Afandi Chicken"><span class="micro">WELCOME • أهلاً وسهلاً</span><h1>Choose your language<br><b>اختر لغتك</b></h1><div class="language-choices"><button data-language="ar">العربية</button><button data-language="en">English</button></div></div></dialog>
   <header class="site-header"><a class="brand" href="#menu" aria-label="Affandi Chicken Dubai"><img decoding="async" src="/assets/menu/affandi-logo.jpeg" alt="Al Afandi Chicken"></a><nav class="header-actions"><button class="language-switch" id="languageSwitch" aria-label="Change language">EN</button><button class="ghost" id="branchQuickBtn" data-i18n="branches">الفروع الخمسة</button><button class="cart-button" id="openCartBtn"><span data-i18n="cart">السلة</span><b id="cartCount">0</b></button></nav></header>
   <noscript><p>Please enable JavaScript to view the menu and prepare your order. الرجاء تفعيل JavaScript لعرض المنيو وتجهيز الطلب.</p></noscript><main>
@@ -31,9 +43,8 @@
   <div class="drawer-backdrop" id="drawerBackdrop" hidden></div><aside class="cart-drawer" id="cartDrawer" aria-hidden="true"><div class="drawer-head"><div><span class="micro">YOUR ORDER</span><h2 data-i18n="yourCart">سلة الطلب</h2></div><button class="icon-button" id="closeCartBtn" aria-label="Close">×</button></div><div id="cartItems" class="cart-items"></div><section id="recommendations" class="recommendations" hidden><span class="micro" data-i18n="completeIt">كمّل وجبتك</span><h3 data-i18n="smartSuggestions">اقتراحات ذكية</h3><div id="recommendationList"></div></section><div class="cart-total"><span data-i18n="total">المجموع</span><strong id="cartTotal">AED 0</strong></div><button class="primary wide" id="checkoutBtn" data-i18n="continueCheckout">اختيار الفرع وإكمال الطلب</button></aside>
   <dialog id="checkoutDialog" class="checkout-dialog"><form id="checkoutForm"><div class="dialog-head"><div><span class="micro">FINAL STEP</span><h2 data-i18n="checkout">إكمال الطلب</h2></div><button type="button" class="icon-button" id="closeCheckoutBtn">×</button></div><label><span data-i18n="selectBranch">اختار الفرع الأقرب</span><select id="branchSelect" required></select></label><div class="two-fields"><label><span data-i18n="name">الاسم</span><input id="customerName" autocomplete="name" required></label><label><span data-i18n="phone">رقم الهاتف</span><input id="customerPhone" type="tel" inputmode="tel" autocomplete="tel" required></label></div><fieldset><legend data-i18n="fulfilment">طريقة الاستلام</legend><div class="mode-grid"><label><input type="radio" name="mode" value="Delivery" required><span>Delivery<small data-i18n="delivery">توصيل</small></span></label><label><input type="radio" name="mode" value="Takeaway"><span>Takeaway<small data-i18n="takeaway">استلام</small></span></label><label><input type="radio" name="mode" value="Dine-in"><span>Dine-in<small data-i18n="dinein">داخل المطعم</small></span></label></div></fieldset><fieldset><legend data-i18n="payment">طريقة الدفع</legend><div class="payment-grid"><label><input type="radio" name="payment" value="WhatsApp / COD" checked><span><b data-i18n="whatsappCod">WhatsApp / الدفع عند الاستلام</b><small data-i18n="availableNow">متاح الآن</small></span></label><label class="locked"><input type="radio" name="payment" value="Card / Wallet" disabled><span><b>Visa • Apple Pay • Google Pay</b><small data-i18n="gatewayPending">بانتظار بيانات بوابة البنك</small></span></label></div></fieldset><div class="checkout-summary"><span data-i18n="orderValue">قيمة الطلب</span><strong id="checkoutTotal">AED 0</strong></div><button class="primary wide" type="submit" data-i18n="sendWhatsapp">إرسال الطلب إلى WhatsApp الفرع</button><p class="privacy" data-i18n="privacy">يُرسل الطلب فقط إلى الفرع الذي اخترته.</p></form></dialog>
   <div class="sticky-bar" id="stickyBar"><button id="stickyCheckout"><b id="stickyCount">0</b><span data-i18n="viewCart">السلة</span><strong id="stickyTotal">AED 0</strong></button></div><dialog id="quickView" class="quick-view"><div class="qv-inner"><button class="icon-button qv-close" id="qvClose" aria-label="Close">×</button><div class="qv-image"><img id="qvImage" alt=""></div><div class="qv-info"><h3 id="qvName"></h3><strong id="qvPrice" class="price"></strong><div class="quantity qv-qty"><button id="qvMinus" aria-label="minus">−</button><b id="qvQty">1</b><button id="qvPlus" aria-label="plus">+</button></div><button class="primary wide" id="qvAdd">أضف إلى السلة</button><span class="micro" id="qvUpsellTitle">يناسبها</span><div class="qv-upsell" id="qvUpsell"></div></div></div></dialog><div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="./app.js?v=20260915p2"></script>
+  <script src="./app.js?v=20260915p3"></script>
   <script src="./reliability.js?v=20260915"></script>
-  <script src="./checkout-rails.js?v=20260915r1"></script>
   <script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};window.si=window.si||function(){(window.siq=window.siq||[]).push(arguments)};</script>
   <script defer src="/_vercel/insights/script.js"></script>
   <script defer src="/_vercel/speed-insights/script.js"></script>
