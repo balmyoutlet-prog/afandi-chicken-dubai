@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: codex/afandi-admin-analytics
+          fetch-depth: 0
       - name: Integrate idempotently and validate source
         run: |
           python scripts/customer-integrate.py
@@ -48,6 +49,8 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html admin/index.html afandi-client.js customer-behavior.js build.mjs vercel.json
           git diff --cached --quiet || git commit -m 'feat: integrate tested customer analytics and opt-in repeat-order UI'
+          git fetch origin codex/afandi-admin-analytics
+          git rebase origin/codex/afandi-admin-analytics
           git push origin HEAD:codex/afandi-admin-analytics
       - uses: actions/upload-artifact@v4
         if: always()
