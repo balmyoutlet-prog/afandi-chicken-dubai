@@ -1,0 +1,60 @@
+name: Owner cold-cache audit
+on:
+  push:
+    branches: [audit/dubai-cold-cache-20260915]
+    paths: ['.github/workflows/owner-cold-cache-audit.yml']
+permissions:
+  contents: read
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --no-save --package-lock=false playwright@1.55.0 lighthouse@13.4.1
+      - name: Read-only cold-cache measurements
+        run: |
+          mkdir -p audit-results
+          cat > owner-cold-audit.mjs <<'JS'
+          import lighthouse from 'lighthouse';
+          import {launch} from 'chrome-launcher';
+          import {chromium} from 'playwright';
+          import fs from 'node:fs';
+          const url='https://alafandichicken.com';
+          const results=[];
+          for(const mode of ['mobile-menu-cold-1','mobile-menu-cold-2','mobile-menu-cold-3','desktop-menu-cold']){
+            const chrome=await launch({chromeFlags:['--headless=new','--no-sandbox','--disable-dev-shm-usage']});
+            try{
+              const browser=await chromium.connectOverCDP(`http://localhost:${chrome.port}`);
+              const context=browser.contexts()[0];
+              const page=await context.newPage();
+              await page.route('**/_vercel/**',r=>r.abort());
+              await page.goto(url,{waitUntil:'load',timeout:45000});
+              const expected=fs.readFileSync('checkout-rails.js','utf8');
+              const deployed=await page.evaluate(async()=>await (await fetch('/checkout-rails.js')).text());
+              if(deployed!==expected)throw Error('Different deployed checkout release, refuse mismatched report');
+              await page.evaluate(()=>{localStorage.setItem('affandi-lang-v2','en');localStorage.setItem('affandi-language-seen-v2','1');sessionStorage.clear()});
+              const cdp=await context.newCDPSession(page);
+              await cdp.send('Network.enable');
+              await cdp.send('Network.clearBrowserCache');
+              await page.close();
+              const opts={port:chrome.port,logLevel:'error',output:['json','html'],onlyCategories:['performance','accessibility','best-practices','seo'],disableStorageReset:true,blockedUrlPatterns:['*/_vercel/*','*wa.me/*']};
+              if(mode.startsWith('desktop'))Object.assign(opts,{formFactor:'desktop',screenEmulation:{mobile:false,width:1440,height:900,deviceScaleFactor:1,disabled:false},throttling:{rttMs:40,throughputKbps:10240,cpuSlowdownMultiplier:1,requestLatencyMs:0,downloadThroughputKbps:0,uploadThroughputKbps:0}});
+              const {lhr,report}=await lighthouse(url,opts);
+              fs.writeFileSync(`audit-results/${mode}.json`,report[0]);
+              fs.writeFileSync(`audit-results/${mode}.html`,report[1]);
+              const metric=id=>({value:lhr.audits[id]?.numericValue,display:lhr.audits[id]?.displayValue});
+              results.push({mode,fetchTime:lhr.fetchTime,networkCache:'explicitly cleared before audit; language preference retained',releaseVerified:true,version:lhr.lighthouseVersion,scores:Object.fromEntries(Object.entries(lhr.categories).map(([id,c])=>[id,Math.round(c.score*100)])),metrics:{fcp:metric('first-contentful-paint'),lcp:metric('largest-contentful-paint'),tbt:metric('total-blocking-time'),cls:metric('cumulative-layout-shift'),speedIndex:metric('speed-index')},warnings:lhr.runWarnings,runtimeError:lhr.runtimeError});
+            }catch(error){results.push({mode,error:error.stack})}finally{await chrome.kill()}
+          }
+          fs.writeFileSync('audit-results/cold-cache-summary.json',JSON.stringify(results,null,2));
+          console.log(JSON.stringify(results,null,2));
+          if(results.some(r=>r.error||r.runtimeError))process.exit(1);
+          JS
+          node owner-cold-audit.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: owner-cold-cache-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 7
