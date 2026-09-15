@@ -26,7 +26,8 @@ jobs:
             for(const [engine,name] of [[chromium,'chromium'],[webkit,'webkit']]){
               const browser=await engine.launch({headless:true});
               try{
-                const page=await browser.newPage({viewport:{width:390,height:844}});
+                const context=await browser.newContext({viewport:{width:390,height:844}});
+                const page=await context.newPage();
                 await page.goto('http://127.0.0.1:8765',{waitUntil:'load'});
                 if(await page.locator('#languageGate').evaluate(e=>e.open)) await page.locator('[data-language=en]').click();
                 assert.equal(await page.locator('#cartDrawer').evaluate(e=>e.inert),true,name+' closed drawer must be inert');
@@ -39,6 +40,7 @@ jobs:
                 await page.locator('#checkoutBtn').click();
                 assert.equal(await page.locator('#checkoutDialog').evaluate(e=>e.open),true,name+' checkout opens');
                 assert.equal(await page.locator('#cartDrawer').evaluate(e=>e.inert),true,name+' drawer inert after checkout opens');
+                await context.close();
                 console.log(name+' PASS');
               } finally { await browser.close(); }
             }
