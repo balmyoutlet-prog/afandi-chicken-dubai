@@ -1,0 +1,58 @@
+name: Resolve owner-confirmed pins
+on:
+  push:
+    branches: [feat/distance-delivery-20260915]
+    paths: ['.github/workflows/confirmed-pins-audit.yml']
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Read the same five confirmed pins; do not change names or numbers
+        run: |
+          mkdir -p audit-results
+          python - <<'PY'
+          import re,json,zipfile,concurrent.futures
+          from pathlib import Path
+          from urllib.parse import urlencode
+          from urllib.request import Request,urlopen
+          ids={'dubai':'0x3e5f5d0006453609:0xf16750c6e45e3fff','majaz':'0x3e5f5b52ab3846cd:0xc0e0d99166adda64','khalifa':'0x3e5f593976eab675:0x396b7b86b566caf1'}
+          def resolve(item):
+              bid,fid=item
+              cid=int(fid.split(':')[1],16)
+              result={'id':bid,'featureId':fid,'cid':str(cid),'responses':[]}
+              for variant,url in [('cid','https://www.google.com/maps?'+urlencode({'cid':str(cid),'hl':'en'})),('place','https://www.google.com/maps/place/?'+urlencode({'q':'place_id:'+fid,'ftid':fid,'hl':'en'})),('embed','https://maps.google.com/maps?'+urlencode({'cid':str(cid),'output':'embed','hl':'en'}))]:
+                  try:
+                      with urlopen(Request(url,headers={'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36','Accept-Language':'en-US,en;q=0.9'}),timeout=25) as r:
+                          raw=r.read(4500000).decode('utf8','replace');final=r.url
+                      Path(f'audit-results/{bid}-{variant}.html').write_text(raw)
+                      pairs=re.findall(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)',raw+final)
+                      contexts=[]
+                      for m in re.finditer(r'(?:25|55)\.\d{4,}',raw):
+                          piece=raw[max(0,m.start()-90):m.end()+90]
+                          if piece not in contexts:contexts.append(piece)
+                          if len(contexts)>=10:break
+                      result['responses'].append({'variant':variant,'url':final,'pairs':pairs[:10],'contexts':contexts})
+                  except Exception as e:result['responses'].append({'variant':variant,'error':str(e)})
+              return result
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool: report=list(pool.map(resolve,ids.items()))
+          Path('audit-results/resolved-pins.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          with zipfile.ZipFile('audit-results/current-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in Path('.').iterdir():
+                  if p.is_file():z.write(p)
+              for folder in ['scripts','.github/workflows']:
+                  for p in Path(folder).rglob('*'):
+                      if p.is_file():z.write(p)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: confirmed-pin-coordinates
+          path: audit-results/
+          retention-days: 7
