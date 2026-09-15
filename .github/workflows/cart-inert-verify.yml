@@ -1,0 +1,46 @@
+name: Cart inert verification
+on:
+  push:
+    branches: [fix/site-watch-cart-inert-20260915]
+    paths: ['reliability.js', '.github/workflows/cart-inert-verify.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2
+          npx playwright install --with-deps chromium webkit
+      - name: Browser verification
+        run: |
+          node --check reliability.js
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/afandi-inert.log 2>&1 &
+          node <<'JS'
+          const {chromium,webkit}=require('playwright');
+          const {default:AxeBuilder}=require('@axe-core/playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            for(const [engine,name] of [[chromium,'chromium'],[webkit,'webkit']]){
+              const browser=await engine.launch({headless:true});
+              try{
+                const page=await browser.newPage({viewport:{width:390,height:844}});
+                await page.goto('http://127.0.0.1:8765',{waitUntil:'load'});
+                if(await page.locator('#languageGate').evaluate(e=>e.open)) await page.locator('[data-language=en]').click();
+                assert.equal(await page.locator('#cartDrawer').evaluate(e=>e.inert),true,name+' closed drawer must be inert');
+                const axe=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();
+                assert.equal(axe.violations.some(v=>v.id==='aria-hidden-focus'),false,name+' aria-hidden focus violation');
+                await page.locator('#menuGrid [data-add=fish]').click();
+                await page.waitForFunction(()=>document.querySelector('#cartDrawer').getAttribute('aria-hidden')==='false' && !document.querySelector('#cartDrawer').inert);
+                assert.equal(await page.locator('#cartDrawer').evaluate(e=>e.inert),false,name+' open drawer must be interactive');
+                await page.locator('#checkoutBtn').scrollIntoViewIfNeeded();
+                await page.locator('#checkoutBtn').click();
+                assert.equal(await page.locator('#checkoutDialog').evaluate(e=>e.open),true,name+' checkout opens');
+                assert.equal(await page.locator('#cartDrawer').evaluate(e=>e.inert),true,name+' drawer inert after checkout opens');
+                console.log(name+' PASS');
+              } finally { await browser.close(); }
+            }
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
