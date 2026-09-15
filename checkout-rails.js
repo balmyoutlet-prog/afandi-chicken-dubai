@@ -80,6 +80,8 @@
     box.querySelectorAll('[data-merch-group]').forEach(section => impressionObserver.observe(section));
   }
   function render(force = false) {
+    document.getElementById('checkoutMerchStatus')?.replaceChildren();
+    dialog.setAttribute('aria-label',text('إكمال الطلب', 'Checkout'));
     if (!force && dialog.open && currentLanguage === lang && box.querySelector('.merch-group')) { updateCounts(); return; }
     currentLanguage = lang;
     const sections = groups();
