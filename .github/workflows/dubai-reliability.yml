@@ -2,7 +2,7 @@ name: Afandi Dubai reliability verification
 on:
   push:
     branches: [fix/dubai-checkout-reliability-20260915, main]
-    paths: ['.github/workflows/dubai-reliability.yml', 'scripts/**', 'reliability.js', 'app.js', 'index.html']
+    paths: ['.github/workflows/dubai-reliability.yml', 'scripts/**', 'reliability.js', 'reliability.css', 'app.js', 'index.html', 'assets/**', 'vercel.json']
   workflow_dispatch:
 permissions:
   contents: write
@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
+          fetch-depth: 0
       - name: Install isolated audit dependencies
         run: |
           python -m pip install Pillow==11.3.0
@@ -34,15 +35,21 @@ jobs:
       - name: Save verified repair to its branch (never directly to main)
         if: github.ref_name == 'fix/dubai-checkout-reliability-20260915'
         run: |
-          mkdir -p .github/audits
-          cp audit-results/assets.json .github/audits/assets-20260915.json
-          cp audit-results/functional.json .github/audits/functional-20260915.json
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js index.html assets .github/audits
+          git add app.js index.html assets
           if ! git diff --cached --quiet; then
             git commit -m 'fix: verified Dubai checkout and exact locally hosted menu images'
-            git push origin HEAD:fix/dubai-checkout-reliability-20260915
+            for attempt in 1 2 3; do
+              git fetch origin fix/dubai-checkout-reliability-20260915
+              git rebase origin/fix/dubai-checkout-reliability-20260915
+              if git push origin HEAD:fix/dubai-checkout-reliability-20260915; then
+                exit 0
+              fi
+              sleep $((attempt * 2))
+            done
+            echo 'Unable to save verified repair after three fast-forward retries.' >&2
+            exit 1
           fi
       - name: Production browser audit after Git deployment
         if: github.ref_name == 'main'
