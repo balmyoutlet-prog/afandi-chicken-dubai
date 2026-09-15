@@ -1,0 +1,93 @@
+name: Publish contact email and check client journey
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/public-email-client-check.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: afandi-public-email-client-check
+  cancel-in-progress: false
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Add only the requested public contact email
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html');s=p.read_text()
+          if 'mailto:info@alafandichicken.com' not in s:
+              assert s.count('</main>')==1
+              footer='<footer class="social-strip" id="afandiPublicFooter" aria-label="Contact Al Afandi Chicken"><a href="mailto:info@alafandichicken.com" dir="ltr">info@alafandichicken.com</a></footer>'
+              p.write_text(s.replace('</main>',footer+'</main>'))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'feat: show info@alafandichicken.com to restaurant customers'
+          git push origin HEAD:main
+          mkdir -p audit-results
+          git rev-parse HEAD > audit-results/contact-commit.txt
+      - name: Prepare mobile browser tests
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Verify published email, TLS, client controls and all five WhatsApp destinations
+        run: |
+          cat > /tmp/live-client.cjs <<'JS'
+          const {chromium,webkit}=require(process.cwd()+'/node_modules/playwright');
+          const assert=require('node:assert/strict'),fs=require('node:fs');
+          const base='https://alafandichicken.com';
+          const report={at:new Date().toISOString(),target:base,liveMessagesSent:0,liveOrdersCreated:0,emailVerified:false,http:[],browsers:[]};
+          const save=()=>fs.writeFileSync('audit-results/live-client.json',JSON.stringify(report,null,2));
+          (async()=>{
+            for(let i=0;i<18;i++){
+              try{const r=await fetch(base+'/?verify_contact=1',{signal:AbortSignal.timeout(15000)});const html=await r.text();if(r.status===200&&html.includes('mailto:info@alafandichicken.com')){report.emailVerified=true;break;}}catch(e){report.lastFetchError=e.message;}
+              await new Promise(r=>setTimeout(r,10000));
+            }
+            for(const url of [base+'/', 'http://alafandichicken.com/', 'https://www.alafandichicken.com/']){
+              try{const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(15000)});report.http.push({url,status:r.status,location:r.headers.get('location'),hsts:r.headers.get('strict-transport-security'),nosniff:r.headers.get('x-content-type-options')});}catch(e){report.http.push({url,error:e.message});}
+            }
+            save();
+            for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
+              const result={browser:name,checks:[],errors:[],brokenImages:[],handoffs:[]};report.browsers.push(result);
+              const browser=await engine.launch(),context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1});
+              await context.route('**/*',route=>{const r=route.request(),u=new URL(r.url());if(/(^|\.)wa\.me$|(^|\.)whatsapp\.com$/.test(u.hostname)){const text=u.searchParams.get('text')||'';result.handoffs.push({destination:u.pathname,containsTestName:text.includes('TEST NOT SENT'),messageHasTotal:/AED\s*\d/.test(text),message:text});return route.fulfill({status:204,body:''});}if(/\/_vercel\/|vercel-insights\.com|vercel-analytics\.com|google-analytics\.com/.test(u.href))return route.fulfill({status:204,body:''});if(r.method()==='POST')return route.abort();return route.continue();});
+              const page=await context.newPage();page.setDefaultTimeout(18000);page.on('pageerror',e=>result.errors.push(e.message));
+              try{
+                const home=await page.goto(base+'/?client_test=1',{waitUntil:'load',timeout:40000});assert.equal(home.status(),200);
+                if(await page.locator('#languageGate').evaluate(e=>e.open))await page.locator('[data-language=en]').click();
+                assert.equal(await page.locator('#menuGrid .menu-card').count(),45);result.checks.push('45 English menu products');
+                await page.locator('#languageSwitch').click();assert.equal(await page.locator('html').getAttribute('lang'),'ar');assert.equal(await page.locator('#menuGrid .menu-card').count(),45);await page.locator('#languageSwitch').click();result.checks.push('Arabic and English menu');
+                const catalog=await page.evaluate(()=>products.map(p=>({id:p.id,price:p.price,cat:p.cat})));
+                for(const cat of ['meals','bowls','wraps','extras','drinks']){await page.locator(`[data-cat="${cat}"]`).click();assert.equal(await page.locator('#menuGrid .menu-card').count(),catalog.filter(p=>p.cat===cat).length);}await page.locator('[data-cat=all]').click();result.checks.push('Every menu category');
+                await page.locator('#menuGrid [data-add=fish]').click();assert.equal(await page.locator('#cartCount').innerText(),'1');await page.locator('#cartItems [data-plus=fish]').click();assert.equal(await page.locator('#cartCount').innerText(),'2');await page.locator('#cartItems [data-minus=fish]').click();assert.equal(await page.locator('#cartCount').innerText(),'1');result.checks.push('Add item, increase and decrease quantity');
+                await page.locator('#checkoutBtn').click();await page.locator('#branchSelect').selectOption('dubai');await page.locator('#customerName').fill('TEST NOT SENT');await page.locator('#customerPhone').fill('0500000000');
+                for(const mode of ['Delivery','Takeaway','Dine-in','Delivery']){await page.locator(`[name=mode][value="${mode}"]`).check();assert.equal(await page.locator('#deliveryAddress').evaluate(e=>e.required),mode==='Delivery');const expected=catalog.find(p=>p.id==='fish').price+(mode==='Delivery'?3:0);const actual=Number((await page.locator('#checkoutTotal').innerText()).replace(/[^0-9.]/g,''));assert.equal(actual,expected);}
+                await page.locator('#deliveryAddress').fill('TEST NOT SENT - NO REAL DELIVERY');result.checks.push('Delivery, takeaway and dine-in totals; required delivery address');
+                await page.locator('#checkoutBackToMenu').click();assert.equal(await page.locator('#checkoutDialog').evaluate(e=>e.open),false);await page.locator('#menuGrid [data-add=water]').click();await page.locator('#checkoutBtn').click();const total=catalog.find(p=>p.id==='fish').price+catalog.find(p=>p.id==='water').price+3;assert.equal(Number((await page.locator('#checkoutTotal').innerText()).replace(/[^0-9.]/g,'')),total);result.checks.push('Return to menu, add water, preserve order and total');
+                const branches=await page.evaluate(()=>branches.map(b=>({id:b.id,phone:b.phone})));
+                for(const b of branches){await page.locator('#branchSelect').selectOption(b.id);await page.locator('#checkoutForm button[type=submit]').click();await page.waitForTimeout(150);assert.equal(result.handoffs.at(-1)?.destination,'/'+b.phone);assert.ok(result.handoffs.at(-1).containsTestName);assert.ok(result.handoffs.at(-1).message.includes('AED '+total));}
+                assert.equal(result.handoffs.length,5);result.checks.push('Correct WhatsApp destination and order summary for all five branches; no messages sent');
+                await page.locator('#checkoutBackToMenu').click();await page.locator('img').evaluateAll(imgs=>imgs.forEach(i=>i.loading='eager'));await page.waitForFunction(()=>[...document.images].filter(i=>i.getAttribute('src')).every(i=>i.complete),null,{timeout:15000});result.brokenImages=await page.locator('img').evaluateAll(imgs=>imgs.filter(i=>i.getAttribute('src')&&!i.naturalWidth).map(i=>i.src));assert.deepEqual(result.brokenImages,[]);result.checks.push('Every referenced image loaded');
+                assert.equal(await page.locator('a[href="mailto:info@alafandichicken.com"]').count(),1);result.checks.push('Public contact email is visible');
+                assert.deepEqual(result.errors,[]);result.checks.push('No JavaScript exceptions');await page.screenshot({path:`audit-results/${name}-live-client.png`,fullPage:true});result.passed=true;
+              }catch(e){result.passed=false;result.errors.push(e.message);await page.screenshot({path:`audit-results/${name}-live-failure.png`,fullPage:true}).catch(()=>{});}finally{await browser.close();save();}
+            }
+            if(!report.emailVerified||report.browsers.some(x=>!x.passed))process.exitCode=1;
+            console.log(JSON.stringify(report,null,2));
+          })().catch(e=>{report.fatal=e.message;save();process.exitCode=1;});
+          JS
+          node /tmp/live-client.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afandi-public-client-verification
+          path: audit-results/
+          retention-days: 7
