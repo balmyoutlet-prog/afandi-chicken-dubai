@@ -74,6 +74,10 @@ if 'const afandiLanguageStorage=' not in app:
     app = app.replace('localStorage.getItem(', 'afandiLanguageStorage.getItem(').replace('localStorage.setItem(', 'afandiLanguageStorage.setItem(')
     app = "const afandiLanguageStorage={getItem(k){try{return localStorage.getItem(k)}catch(_){return null}},setItem(k,v){try{localStorage.setItem(k,v)}catch(_){}}};\n" + app
     app = app.replace("let lang=afandiLanguageStorage.getItem('affandi-lang-v2')||'ar'", "let lang=afandiLanguageStorage.getItem('affandi-lang-v2')==='en'?'en':'ar'")
+if 'reliability.css?v=20260915' not in html:
+    css_marker = '<link rel="stylesheet" href="./affandi.css?v=20260911e">'
+    assert css_marker in html, 'Source changed: review before altering stylesheet inclusion'
+    html = html.replace(css_marker, css_marker + '\n<link rel="stylesheet" href="./reliability.css?v=20260915">')
 if 'reliability.js?v=20260915' not in html:
     marker = '<script src="./app.js?v=20260911e"></script>'
     assert marker in html, 'Source changed: review before altering script inclusion'
