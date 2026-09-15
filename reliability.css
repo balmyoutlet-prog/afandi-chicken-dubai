@@ -1,0 +1,5 @@
+/* Keep each invisible native radio inside its own visible option card. */
+.mode-grid label,.payment-grid label{position:relative}
+.mode-grid input,.payment-grid input{inset:0;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent;cursor:pointer;z-index:2}
+.payment-grid .locked input{cursor:not-allowed}
+.mode-grid input:focus-visible+span,.payment-grid input:focus-visible+span{outline:3px solid #121212;outline-offset:2px}
