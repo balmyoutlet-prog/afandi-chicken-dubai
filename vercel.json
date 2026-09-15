@@ -123,6 +123,10 @@
   "installCommand": "",
   "rewrites": [
     {
+      "source": "/api/insights/:path*",
+      "destination": "https://ncadxnjjwuklckxrkcjf.supabase.co/functions/v1/afandi-dubai-insights/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "https://ncadxnjjwuklckxrkcjf.supabase.co/functions/v1/afandi-dubai-api/:path*"
     },
