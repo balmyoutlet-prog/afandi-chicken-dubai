@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /backend/
+Disallow: /tests/
+Disallow: /scripts/
+Sitemap: https://alafandichicken.com/sitemap.xml
