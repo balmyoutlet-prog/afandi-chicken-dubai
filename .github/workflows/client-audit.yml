@@ -1,0 +1,102 @@
+name: Afandi Dubai client audit
+on:
+  push:
+    branches: [codex/afandi-admin-analytics]
+    paths: [.github/workflows/client-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: afandi-client-audit
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare source snapshot and browser tools
+        run: |
+          mkdir -p audit-results
+          tar --exclude=.git --exclude=audit-results --exclude=node_modules -czf /tmp/afandi-source.tar.gz .
+          cp /tmp/afandi-source.tar.gz audit-results/source.tar.gz
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Test public client journey without sending orders or analytics
+        env:
+          TARGET_URL: https://alafandichicken.com
+        run: |
+          cat > /tmp/client-audit.cjs <<'JS'
+          const {chromium, webkit} = require(process.cwd() + '/node_modules/playwright');
+          const fs = require('node:fs');
+          const base = process.env.TARGET_URL;
+          const report = {target:base, at:new Date().toISOString(), http:[], browsers:[], liveOrdersSent:0};
+          const save=()=>fs.writeFileSync('audit-results/report.json', JSON.stringify(report,null,2));
+          (async()=>{
+            for(const url of [base+'/', 'http://alafandichicken.com/', 'https://www.alafandichicken.com/']){
+              try{ const r=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(15000)}); report.http.push({url,status:r.status,location:r.headers.get('location'),headers:Object.fromEntries(['strict-transport-security','x-content-type-options','x-frame-options','referrer-policy','content-security-policy'].map(k=>[k,r.headers.get(k)]))}); }
+              catch(e){report.http.push({url,error:e.message,cause:e.cause?.code});}
+            }
+            save();
+            for(const [name,engine] of [['chromium',chromium],['webkit',webkit]]){
+              const result={browser:name,checks:[],errors:[],failedRequests:[],orderNavigation:[]}; report.browsers.push(result);
+              const browser=await engine.launch(); const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,ignoreHTTPSErrors:false});
+              await context.route('**/*', async route=>{
+                const u=new URL(route.request().url());
+                if(/(^|\.)wa\.me$|(^|\.)whatsapp\.com$/.test(u.hostname)){
+                  result.orderNavigation.push({host:u.hostname,path:u.pathname,text:u.searchParams.get('text')});
+                  return route.fulfill({status:200,contentType:'text/html',body:'Order handoff intercepted. No message was sent.'});
+                }
+                if(/\/_vercel\/(insights|speed-insights)\/|vercel-insights\.com|vercel-analytics\.com/.test(u.href)) return route.fulfill({status:204,body:''});
+                if(route.request().method()==='POST' && /\/api\//.test(u.pathname)) return route.abort();
+                return route.continue();
+              });
+              const page=await context.newPage();
+              page.on('pageerror',e=>result.errors.push(e.message));
+              page.on('requestfailed',r=>{if(!/whatsapp|wa\.me|insights/.test(r.url())) result.failedRequests.push({url:r.url(),error:r.failure()?.errorText});});
+              try{
+                const response=await page.goto(base+'/?client_test=1',{waitUntil:'domcontentloaded',timeout:30000});
+                result.checks.push({test:'https_homepage',status:response.status(),finalUrl:page.url()});
+                await page.locator('#languageGate').waitFor({state:'visible',timeout:10000}).catch(()=>{});
+                if(await page.locator('[data-language="en"]').isVisible()) await page.locator('[data-language="en"]').click();
+                await page.locator('.menu-card').first().waitFor({timeout:15000});
+                result.checks.push({test:'english_menu',count:await page.locator('.menu-card').count(),lang:await page.locator('html').getAttribute('lang')});
+                await page.screenshot({path:'audit-results/'+name+'-menu.png',fullPage:true});
+                const images=await page.locator('img').evaluateAll(imgs=>imgs.map(i=>({src:i.currentSrc||i.src,alt:i.alt,loaded:i.complete&&i.naturalWidth>0,loading:i.loading})));
+                result.images=images;
+                await page.locator('#languageSwitch').click();
+                result.checks.push({test:'arabic_menu',lang:await page.locator('html').getAttribute('lang'),count:await page.locator('.menu-card').count()});
+                await page.locator('#languageSwitch').click();
+                const first=page.locator('[data-add]').first(); await first.click();
+                if(await page.locator('#quickView').evaluate(e=>e.open).catch(()=>false)) await page.locator('#qvAdd').click();
+                result.checks.push({test:'add_to_cart',count:await page.locator('#cartCount').textContent()});
+                await page.locator('#openCartBtn').click();
+                const plus=page.locator('#cartItems [data-plus]').first(); if(await plus.count()) await plus.click();
+                result.checks.push({test:'cart_quantity',text:await page.locator('#cartItems').innerText(),total:await page.locator('#cartTotal').textContent()});
+                await page.locator('#checkoutBtn').click();
+                await page.locator('#branchSelect').selectOption('dubai');
+                await page.locator('#customerName').fill('AUTOMATED TEST - NOT SENT');
+                await page.locator('#customerPhone').fill('0500000000');
+                await page.locator('input[name="mode"][value="Delivery"]').check({force:true});
+                const address=page.locator('#deliveryAddress');
+                result.checks.push({test:'delivery_address_required',exists:await address.count(),required:await address.evaluate(e=>e.required).catch(()=>false)});
+                if(await address.count()) await address.fill('AUTOMATED TEST - DO NOT DELIVER');
+                result.checks.push({test:'checkout_total',text:await page.locator('#checkoutTotal').textContent()});
+                await page.screenshot({path:'audit-results/'+name+'-checkout.png',fullPage:true});
+                // Intercept the outgoing WhatsApp URL; no external message or real order is submitted.
+                await page.locator('#checkoutForm button[type="submit"]').click();
+                await page.waitForTimeout(1000);
+                result.checks.push({test:'whatsapp_handoff_intercepted',count:result.orderNavigation.length});
+              }catch(e){result.errors.push(e.message)}finally{await browser.close();save();}
+            }
+            console.log(JSON.stringify(report,null,2));
+          })().catch(e=>{report.fatal=e.message;save();process.exitCode=1});
+          JS
+          node /tmp/client-audit.cjs
+      - name: Save inspection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: afandi-client-audit
+          path: audit-results/
+          retention-days: 7
