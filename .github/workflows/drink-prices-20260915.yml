@@ -1,0 +1,164 @@
+name: Apply and verify Dubai drink prices
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/drink-prices-20260915.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: dubai-drink-prices-20260915
+  cancel-in-progress: false
+jobs:
+  prices:
+    if: github.repository == 'balmyoutlet-prog/afandi-chicken-dubai'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Change only drink prices and the application cache version
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re,json
+          app=Path('app.js')
+          before=app.read_text()
+          lines=before.splitlines(keepends=True)
+          changes=[]
+          for i,line in enumerate(lines):
+              if not re.match(r"^\{id:'[^']+'",line) or "cat:'drinks'" not in line:
+                  continue
+              product_id=re.search(r"id:'([^']+)'",line).group(1)
+              old=int(re.search(r'price:(\d+)',line).group(1))
+              new=3 if product_id=='water' else 5
+              edited,n=re.subn(r'price:\d+',f'price:{new}',line,count=1)
+              assert n==1
+              assert re.sub(r'price:\d+','price:PRICE',line)==re.sub(r'price:\d+','price:PRICE',edited)
+              lines[i]=edited
+              changes.append({'id':product_id,'before':old,'after':new})
+          assert len(changes)==10,changes
+          assert len({p['id'] for p in changes})==10
+          assert sum(p['id']=='water' for p in changes)==1
+          app.write_text(''.join(lines))
+          index=Path('index.html')
+          html=index.read_text()
+          html,n=re.subn(r'(src="\./app\.js\?v=)[^"\s]+',r'\g<1>20260915-drinks5-water3',html)
+          assert n==1
+          index.write_text(html)
+          Path('audit-results').mkdir(exist_ok=True)
+          Path('audit-results/drink-price-changes.json').write_text(json.dumps(changes,indent=2))
+          print(json.dumps(changes,indent=2))
+          PY
+          node --check app.js
+          node --check reliability.js
+          node --check checkout-rails.js
+      - name: Install browser verification tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Prepare isolated price checks
+        run: |
+          cat > .drink-price-check.cjs <<'JS'
+          const {chromium,webkit}=require('playwright');
+          const assert=require('node:assert/strict');
+          const fs=require('node:fs');
+          const base=process.env.AUDIT_BASE||'http://127.0.0.1:8765';
+          const report={base,tests:[],realOrdersSent:0};
+          (async()=>{
+            for(const [engine,label] of [[chromium,'chromium'],[webkit,'webkit']]){
+              const browser=await engine.launch({headless:true});
+              try{
+                for(const language of ['en','ar']){
+                  const context=await browser.newContext({viewport:{width:390,height:844}});
+                  await context.route('**/_vercel/**',r=>r.abort());
+                  await context.route('https://wa.me/**',r=>r.abort());
+                  await context.route('https://api.whatsapp.com/**',r=>r.abort());
+                  const page=await context.newPage();
+                  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+                  assert.equal((await page.goto(base,{waitUntil:'load',timeout:60000})).status(),200);
+                  if(await page.locator('#languageGate').evaluate(e=>e.open))await page.locator('[data-language='+language+']').click();
+                  else await page.evaluate(l=>applyLanguage(l,true),language);
+                  const drinks=await page.evaluate(()=>products.filter(p=>p.cat==='drinks').map(p=>({id:p.id,price:p.price})));
+                  assert.equal(drinks.length,10);
+                  for(const p of drinks)assert.equal(p.price,p.id==='water'?3:5,p.id);
+                  await page.locator('#filters [data-cat=drinks]').click();
+                  assert.equal(await page.locator('#menuGrid .menu-card').count(),10);
+                  for(const p of drinks){
+                    const card=page.locator('#menuGrid .menu-card').filter({has:page.locator('[data-add="'+p.id+'"]')});
+                    assert.equal((await card.locator('.price').textContent()).trim(),'AED '+p.price);
+                    const before=await page.evaluate(()=>totals());
+                    await card.locator('[data-add="'+p.id+'"]').click();
+                    assert.equal(await page.evaluate(()=>totals()),before+p.price);
+                    await page.evaluate(()=>{closeCart();if(document.querySelector('#quickView').open)document.querySelector('#quickView').close()});
+                  }
+                  assert.equal(await page.evaluate(()=>totals()),48);
+                  await page.locator('#openCartBtn').click();
+                  assert.equal((await page.locator('#cartTotal').textContent()).trim(),'AED 48');
+                  await page.locator('#checkoutBtn').click();
+                  await page.locator('[name=mode][value=Takeaway]').check();
+                  assert.equal((await page.locator('#checkoutTotal').textContent()).trim(),'AED 48');
+                  await page.locator('[name=mode][value=Delivery]').check();
+                  assert.equal((await page.locator('#checkoutTotal').textContent()).trim(),'AED 51');
+                  const offers=await page.locator('[data-merch-group=drinks] [data-merch-add]').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.merchAdd,text:n.parentElement.textContent})));
+                  assert(offers.length>0,'Checkout drinks visible');
+                  for(const o of offers)assert(o.text.includes('AED '+(o.id==='water'?3:5)),o.id+' '+o.text);
+                  await page.evaluate(()=>{cart={pepsi:2,water:2};renderCart()});
+                  assert.equal(await page.evaluate(()=>totals()),16);
+                  assert.equal(await page.evaluate(()=>orderTotal()),19);
+                  assert.equal((await page.locator('#checkoutTotal').textContent()).trim(),'AED 19');
+                  assert.deepEqual(errors,[]);
+                  report.tests.push({browser:label,language,pass:true,drinkCount:10,softDrinkPrice:5,waterPrice:3,allDrinksSubtotal:48,withDelivery:51,twoPepsiTwoWaterSubtotal:16,checkoutOffers:offers.length,uncaughtErrors:0});
+                  await context.close();
+                }
+              }finally{await browser.close()}
+            }
+            fs.writeFileSync('audit-results/drink-prices-'+(base.startsWith('https:')?'live':'local')+'.json',JSON.stringify(report,null,2));
+            console.log(JSON.stringify(report,null,2));
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/afandi-price-server.log 2>&1 &
+          node .drink-price-check.cjs
+      - name: Save verified prices without overwriting concurrent changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js index.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: Dubai drinks AED 5 and water AED 3, browser verified'
+            git fetch origin main
+            git rebase origin/main
+            node --check app.js
+            git push origin HEAD:main
+          fi
+      - name: Verify exact pricing release on the public domain
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import Request,urlopen
+          import hashlib,time
+          expected=hashlib.sha256(Path('app.js').read_bytes()).hexdigest()
+          for attempt in range(40):
+              try:
+                  with urlopen(Request('https://alafandichicken.com/?price-check=20260915',headers={'Cache-Control':'no-cache'}),timeout=15) as r:
+                      html=r.read().decode()
+                  with urlopen('https://alafandichicken.com/app.js?v=20260915-drinks5-water3',timeout=15) as r:
+                      actual=hashlib.sha256(r.read()).hexdigest()
+                  if 'app.js?v=20260915-drinks5-water3' in html and actual==expected:
+                      print('Exact new drink prices are publicly served.')
+                      break
+              except Exception as e:
+                  print(type(e).__name__)
+              time.sleep(3)
+          else:
+              raise SystemExit('Source saved, but exact production release is not yet verified.')
+          PY
+          AUDIT_BASE=https://alafandichicken.com node .drink-price-check.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dubai-drink-prices-${{ github.run_id }}
+          path: audit-results/drink-price*.json
+          retention-days: 7
