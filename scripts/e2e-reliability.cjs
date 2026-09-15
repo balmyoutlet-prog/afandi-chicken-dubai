@@ -1,4 +1,5 @@
 const { chromium, webkit } = require('playwright');
+const setDeliveryLocation = require('./delivery-test-helper.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -72,11 +73,12 @@ async function run(browserType, viewport, label) {
   await page.locator('#customerPhone').fill('0500000000');
   await page.locator('[name="mode"][value="Delivery"]').check();
   await page.locator('#deliveryAddress').fill('TEST ONLY - synthetic address, no delivery');
+  await setDeliveryLocation(page, 'dubai');
   const fishPrice = catalog.find(p => p.id === 'fish').price;
-  assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${fishPrice + 3}`);
+  assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${fishPrice + 5}`);
   await page.locator('#checkoutSuggest [data-add="pepsi"]').first().click();
   const subtotal = fishPrice + catalog.find(p => p.id === 'pepsi').price;
-  assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${subtotal + 3}`, 'Delivery fee survives checkout upsell');
+  assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${subtotal + 5}`, 'Delivery fee survives checkout upsell');
   assert.equal(await page.locator('#cartDrawer').getAttribute('aria-hidden'), 'true', 'Upsell must not hide checkout behind a drawer');
   await page.locator('#checkoutBackToMenu').click();
   assert.equal(await page.locator('#checkoutDialog').evaluate(el => el.open), false);
@@ -86,7 +88,7 @@ async function run(browserType, viewport, label) {
   assert.equal(await page.locator('#branchSelect').inputValue(), 'dubai');
   await page.evaluate(() => applyLanguage('ar', true));
   assert.equal(await page.locator('#branchSelect').inputValue(), 'dubai', 'Language switch preserves selected branch');
-  assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${subtotal + 3}`);
+  assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${subtotal + 5}`);
   results.cases.push({ label, test: 'quantity, checkout upsell, delivery total, add-items return, branch preservation', pass: true });
 
   const branchList = await page.evaluate(() => branches.map(b => ({ id: b.id, phone: b.phone, ar: b.ar, en: b.en })));
@@ -96,7 +98,8 @@ async function run(browserType, viewport, label) {
       await page.locator('#branchSelect').selectOption(branch.id);
       for (const mode of ['Delivery', 'Takeaway', 'Dine-in']) {
         await page.locator(`[name="mode"][value="${mode}"]`).check();
-        const expected = subtotal + (mode === 'Delivery' ? 3 : 0);
+        if (mode === 'Delivery') await setDeliveryLocation(page, branch.id);
+        const expected = subtotal + (mode === 'Delivery' ? 5 : 0);
         assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${expected}`);
         const count = handedOff.length;
         await page.locator('#checkoutForm button[type="submit"]').click();

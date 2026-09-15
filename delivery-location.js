@@ -85,6 +85,7 @@
   function invalidate(){confirmed=false;messageKey='';sequence++;busy=false;}
   function setCandidate(point,source,accuracy){
     if(!P.validPoint(point)){messageKey='invalid';refresh();return;}
+    el('deliveryCoordinates').setCustomValidity('');
     invalidate();candidate={lat:point.lat,lng:point.lng,source,accuracy:accuracy||null,imprecise:source==='gps'&&(!Number.isFinite(accuracy)||accuracy>250)};
     messageKey=candidate.imprecise?'imprecise':'';
     if(map){if(marker)marker.setLatLng([point.lat,point.lng]);else createMarker(point);}

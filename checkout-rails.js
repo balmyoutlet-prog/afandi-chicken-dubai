@@ -99,7 +99,7 @@
       addItem(p.id);
       event('checkout_recommendation_add', {item_id:p.id,category:button.dataset.merchCategory,price:p.price,value:orderTotal()});
       const status = document.getElementById('checkoutMerchStatus');
-      status.textContent = text('تمت إضافة ', 'Added ') + productName(p) + text('. المجموع ', '. Total ') + money(orderTotal());
+      status.textContent = text('تمت إضافة ', 'Added ') + productName(p) + text('. المجموع ', '. Total ') + (window.AfandiDeliveryUI?.totalLabel() || money(orderTotal()));
     };
     for (const button of box.querySelectorAll('[data-merch-view]')) button.onclick = () => openQuickView(button.dataset.merchView);
     for (const button of box.querySelectorAll('[data-rail-direction]')) button.onclick = () => {

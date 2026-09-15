@@ -1,4 +1,5 @@
 const {chromium,webkit}=require('playwright');
+const setDeliveryLocation=require('./delivery-test-helper.cjs');
 const {default:AxeBuilder}=require('@axe-core/playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -35,6 +36,7 @@ async function run(type,viewport,label){
   await page.locator('#customerPhone').fill('0500000000');
   await page.locator('[name=mode][value=Delivery]').check();
   await page.locator('#deliveryAddress').fill('TEST ONLY - no actual delivery');
+  await setDeliveryLocation(page,'dubai');
   const groups=await page.locator('[data-merch-group]').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.merchGroup,category:n.dataset.category,ids:Array.from(n.querySelectorAll('[data-merch-add]'),b=>b.dataset.merchAdd)})));
   for(const cat of new Set(catalog.map(p=>p.cat)))assert(groups.some(g=>g.category===cat),'Missing category '+cat);
   assert(groups.every(g=>g.ids.length>0&&g.ids.length<=8&&new Set(g.ids).size===g.ids.length));
@@ -89,14 +91,14 @@ async function run(type,viewport,label){
   // No recommendation selected by default; reset in this isolated test session.
   await page.evaluate(()=>{cart={fish:1};renderCart();renderCheckoutSuggest(true)});
   await page.locator('.merch-skip').click();
-  assert.equal(await page.evaluate(()=>orderTotal()),38);
+  assert.equal(await page.evaluate(()=>orderTotal()),40);
   assert.equal(handoffs.length,0,'Skip is not submit');
   await page.locator('#checkoutForm button[type=submit]').click();
   await page.waitForTimeout(150);
   assert.equal(handoffs.length,1);
   const url=new URL(handoffs[0]);
   assert.equal(url.pathname,'/971528666619');
-  assert(url.searchParams.get('text').includes('AED 38'));
+  assert(url.searchParams.get('text').includes('AED 40'));
   await page.locator('#checkoutBackToMenu').click();
   assert.equal(await page.locator('#cartCount').textContent(),'1');
   await page.locator('#openCartBtn').click();await page.locator('#checkoutBtn').click();
