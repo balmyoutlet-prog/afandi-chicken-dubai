@@ -53,7 +53,7 @@ jobs:
           for attempt in range(40):
               try:
                   with urlopen('https://alafandichicken.com',timeout=15) as response:
-                      ready='checkout-rails.js?v=20260915r1' in response.read().decode()
+                      ready='checkout-rails.js?v=20260915r2' in response.read().decode()
                   with urlopen('https://alafandichicken.com/checkout-rails.js',timeout=15) as response:
                       ready=ready and hashlib.sha256(response.read()).hexdigest()==expected
                   if ready:

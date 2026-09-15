@@ -138,13 +138,14 @@
     if (!/^\d{8,15}$/.test(phoneDigits)) return invalid($('#customerPhone'), copy('اكتب رقم هاتف صحيحاً', 'Enter a valid phone number'));
     if (!['Delivery', 'Takeaway', 'Dine-in'].includes(mode)) return;
     if (mode === 'Delivery' && !address) return invalid($('#deliveryAddress'), copy('أدخل عنوان التوصيل', 'Enter a delivery address'));
+    if (mode === 'Delivery' && !window.AfandiDeliveryUI?.validateForSubmit()) { showToast(copy('حدّد وأكّد موقع التوصيل أولاً', 'Choose and confirm your delivery location first')); return; }
     const lines = Object.entries(cart).map(([id, qty]) => {
       const p = products.find(item => item.id === id);
       return `• ${productName(p)} × ${qty} — ${money(p.price * qty)}`;
     }).join('\n');
     const addressLine = mode === 'Delivery' ? `\n${t('address')}: ${address}` : '';
     const feeLine = mode === 'Delivery' ? `\n${t('deliveryFee')}: ${money(deliveryFee())}` : '';
-    const message = `${t('newOrder')}\n\n${t('branch')}: ${branchName(branch)}\n${t('customer')}: ${name}\n${t('phone')}: ${phone}\n${t('receipt')}: ${mode}${addressLine}\n${t('payMethod')}: WhatsApp / COD\n\n${lines}${feeLine}\n\n${t('orderTotal')}: ${money(orderTotal())}`;
+    const message = `${t('newOrder')}\n\n${t('branch')}: ${branchName(branch)}\n${t('customer')}: ${name}\n${t('phone')}: ${phone}\n${t('receipt')}: ${mode}${addressLine}\n${t('payMethod')}: WhatsApp / COD\n\n${lines}${feeLine}${mode === 'Delivery' ? window.AfandiDeliveryUI.whatsappLines() : ''}\n\n${t('orderTotal')}: ${money(orderTotal())}`;
     saveCart();
     window.location.href = `https://wa.me/${branch.phone}?text=${encodeURIComponent(message)}`;
   };
