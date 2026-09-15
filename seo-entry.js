@@ -1,0 +1,2 @@
+/* Open the requested dish; never add anything without a customer click. */
+(()=>{const p=new URLSearchParams(location.search),id=p.get('item'),language=p.get('lang');if(!id||!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)||!products.some(x=>x.id===id))return;if(['ar','en'].includes(language))applyLanguage(language,false);if(document.querySelector('#languageGate').open)document.querySelector('#languageGate').close();openQuickView(id);})();
