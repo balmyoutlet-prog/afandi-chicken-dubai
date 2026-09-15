@@ -1,0 +1,37 @@
+name: Afandi delivery distance
+on:
+  push:
+    branches: [feat/distance-delivery-20260915]
+    paths: ['.github/workflows/delivery-distance.yml']
+permissions:
+  contents: read
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve only existing owner-approved branch maps
+        run: |
+          mkdir -p audit-results
+          python - <<'PY'
+          import re,json
+          from pathlib import Path
+          from urllib.request import Request,urlopen
+          app=Path('app.js').read_text()
+          branches=re.findall(r"\{id:'([^']+)'[^\n]+?map:'([^']+)'",app)
+          report=[]
+          for bid,url in branches:
+              try:
+                  with urlopen(Request(url,headers={'User-Agent':'Mozilla/5.0'}),timeout=20) as r:
+                      text=r.read(2000000).decode('utf-8','replace')
+                      report.append({'id':bid,'source':url,'final':r.url,'status':r.status,'point_pairs':re.findall(r'!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)',r.url+text)[:4],'title':re.findall('<title>(.*?)</title>',text)[:1]})
+              except Exception as e:report.append({'id':bid,'source':url,'error':str(e)})
+          Path('audit-results/branch-pins.json').write_text(json.dumps(report,indent=2))
+          print(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: afandi-branch-pins
+          path: audit-results/
+          retention-days: 7
