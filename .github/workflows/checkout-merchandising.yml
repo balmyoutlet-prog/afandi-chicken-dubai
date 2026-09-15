@@ -1,0 +1,94 @@
+name: Checkout merchandising verification
+on:
+  push:
+    branches: [feat/dubai-checkout-rails-20260915, main]
+    paths: ['checkout-rails.*', 'scripts/prepare-checkout-rails.py', 'scripts/e2e-checkout-rails.cjs', 'scripts/lighthouse-audit.mjs', '.github/workflows/checkout-merchandising.yml', 'index.html']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: checkout-merchandising-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepare checkout integration on feature branch
+        if: github.ref_name == 'feat/dubai-checkout-rails-20260915'
+        run: python scripts/prepare-checkout-rails.py
+      - name: Install isolated test tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2 lighthouse@13.4.1
+          npx playwright install --with-deps chromium webkit
+      - name: Syntax and full local customer journey
+        run: |
+          node --check app.js
+          node --check reliability.js
+          node --check checkout-rails.js
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/afandi-merch-server.log 2>&1 &
+          node scripts/e2e-reliability.cjs
+          node scripts/e2e-checkout-rails.cjs
+      - name: Save only tested HTML integration to feature branch
+        if: github.ref_name == 'feat/dubai-checkout-rails-20260915'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: activate browser-verified optional checkout rails'
+            git push origin HEAD:feat/dubai-checkout-rails-20260915
+          fi
+      - name: Wait for exact public release
+        if: github.ref_name == 'main'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import hashlib,time
+          expected=hashlib.sha256(Path('checkout-rails.js').read_bytes()).hexdigest()
+          for attempt in range(40):
+              try:
+                  with urlopen('https://alafandichicken.com',timeout=15) as response:
+                      ready='checkout-rails.js?v=20260915r1' in response.read().decode()
+                  with urlopen('https://alafandichicken.com/checkout-rails.js',timeout=15) as response:
+                      ready=ready and hashlib.sha256(response.read()).hexdigest()==expected
+                  if ready:
+                      break
+              except Exception:
+                  pass
+              time.sleep(3)
+          else:
+              raise SystemExit('Expected release not live: no production success claim')
+          PY
+      - name: Verify public production end to end
+        if: github.ref_name == 'main'
+        env:
+          AUDIT_BASE: https://alafandichicken.com
+        run: node scripts/e2e-checkout-rails.cjs
+      - name: Public Lighthouse mobile and desktop audit
+        if: github.ref_name == 'main'
+        run: node scripts/lighthouse-audit.mjs
+      - name: Export public website source for independent review
+        if: always()
+        run: |
+          mkdir -p audit-results
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          with zipfile.ZipFile('audit-results/site-snapshot.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in Path('.').iterdir():
+                  if p.is_file() and p.suffix in ['.js','.css','.html','.ico','.png','.json','.txt','.xml'] and p.name not in ['package-lock.json','package.json']:
+                      z.write(p)
+              for p in Path('assets').rglob('*'):
+                  if p.is_file():z.write(p)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checkout-merchandising-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 7

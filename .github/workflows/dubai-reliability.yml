@@ -1,0 +1,105 @@
+name: Afandi Dubai reliability verification
+on:
+  push:
+    branches: [fix/dubai-checkout-reliability-20260915, main]
+    paths: ['.github/workflows/dubai-reliability.yml', 'scripts/**', 'reliability.js', 'reliability.css', 'app.js', 'index.html', 'assets/**', 'vercel.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: afandi-reliability-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Install isolated audit dependencies
+        run: |
+          python -m pip install Pillow==11.3.0
+          npm install --no-save --package-lock=false playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Prepare exact local media and small reliability changes on repair branch only
+        if: github.ref_name == 'fix/dubai-checkout-reliability-20260915'
+        run: python scripts/prepare-reliability.py
+      - name: Syntax and localhost browser validation
+        run: |
+          node --check app.js
+          node --check reliability.js
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/afandi-server.log 2>&1 &
+          node scripts/e2e-reliability.cjs
+      - name: Save verified repair to its branch (never directly to main)
+        if: github.ref_name == 'fix/dubai-checkout-reliability-20260915'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js index.html assets
+          if ! git diff --cached --quiet; then
+            git commit -m 'fix: verified Dubai checkout and exact locally hosted menu images'
+            for attempt in 1 2 3; do
+              git fetch origin fix/dubai-checkout-reliability-20260915
+              git rebase origin/fix/dubai-checkout-reliability-20260915
+              if git push origin HEAD:fix/dubai-checkout-reliability-20260915; then
+                exit 0
+              fi
+              sleep $((attempt * 2))
+            done
+            echo 'Unable to save verified repair after three fast-forward retries.' >&2
+            exit 1
+          fi
+      - name: Production browser audit after Git deployment
+        if: github.ref_name == 'main'
+        env:
+          AUDIT_BASE: https://alafandichicken.com
+        run: |
+          python - <<'PY'
+          from urllib.request import urlopen
+          import time
+          for attempt in range(24):
+              try:
+                  with urlopen('https://alafandichicken.com', timeout=15) as response:
+                      if 'reliability.js?v=20260915' in response.read().decode():
+                          break
+              except Exception:
+                  pass
+              time.sleep(5)
+          else:
+              raise SystemExit('New release not visible on production; do not report live success')
+          PY
+          node scripts/e2e-reliability.cjs
+      - name: Public DNS-independent HTTPS and redirect observations
+        if: always()
+        run: |
+          mkdir -p audit-results
+          python - <<'PY'
+          import json, ssl, socket, time
+          from urllib.request import Request, urlopen
+          result={'urls':[], 'certificates':[]}
+          for url in ['http://alafandichicken.com','https://alafandichicken.com','http://www.alafandichicken.com','https://www.alafandichicken.com']:
+              start=time.monotonic()
+              try:
+                  with urlopen(Request(url, headers={'User-Agent':'Mozilla/5.0 Afandi-Authorized-Audit'}), timeout=20) as r:
+                      result['urls'].append({'url':url,'final_url':r.url,'status':r.status,'elapsed_ms':round((time.monotonic()-start)*1000),'headers':dict(r.headers)})
+              except Exception as e:
+                  result['urls'].append({'url':url,'error':str(e)})
+          for domain in ['alafandichicken.com','www.alafandichicken.com']:
+              try:
+                  with socket.create_connection((domain,443),timeout=15) as s:
+                      with ssl.create_default_context().wrap_socket(s,server_hostname=domain) as tls:
+                          c=tls.getpeercert()
+                          result['certificates'].append({'domain':domain,'verified':True,'tls':tls.version(),'expires':c.get('notAfter'),'subjectAltName':c.get('subjectAltName')})
+              except Exception as e:
+                  result['certificates'].append({'domain':domain,'verified':False,'error':str(e)})
+          open('audit-results/network.json','w').write(json.dumps(result,indent=2))
+          print(json.dumps(result,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: afandi-dubai-audit-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 7
