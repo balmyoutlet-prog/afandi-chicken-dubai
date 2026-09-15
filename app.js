@@ -52,15 +52,15 @@ const products=[
 {id:'coleslaw',ar:'كولسلو',en:'Coleslaw',arDesc:'طازج وكريمي',enDesc:'Fresh and creamy',price:6,cat:'extras',tag:'FRESH'},
 
 {id:'water',ar:'مياه',en:'Water',arDesc:'مياه شرب معبأة',enDesc:'Bottled drinking water',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/water.webp'},
-{id:'kinza-lemon',ar:'كينزا ليمون',en:'Kinza Lemon',arDesc:'مشروب غازي بنكهة الليمون',enDesc:'Lemon flavoured soft drink',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/kinza-lemon.webp'},
-{id:'kinza-orange',ar:'كينزا برتقال',en:'Kinza Orange',arDesc:'مشروب غازي بنكهة البرتقال',enDesc:'Orange flavoured soft drink',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/kinza-orange.webp'},
-{id:'kinza-cola',ar:'كينزا كولا',en:'Kinza Cola',arDesc:'مشروب غازي كولا',enDesc:'Cola soft drink',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/kinza-cola.webp'},
-{id:'mirinda',ar:'ميرندا',en:'Mirinda',arDesc:'مشروب غازي بنكهة البرتقال',enDesc:'Orange soft drink',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/mirinda.webp'},
-{id:'mountain-dew',ar:'ماونتن ديو',en:'Mountain Dew',arDesc:'مشروب غازي منعش',enDesc:'Refreshing soft drink',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/mountain-dew.webp'},
-{id:'7up-diet',ar:'سفن أب دايت',en:'7UP Diet',arDesc:'مشروب غازي بدون سكر',enDesc:'Zero sugar soft drink',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/7up-diet.webp'},
-{id:'7up',ar:'سفن أب',en:'7UP',arDesc:'ليمون وليمون أخضر منعش',enDesc:'Refreshing lemon & lime',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/7up.webp'},
-{id:'pepsi-diet',ar:'بيبسي دايت',en:'Pepsi Diet',arDesc:'كولا بدون سكر',enDesc:'Diet cola',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/pepsi-diet.webp'},
-{id:'pepsi',ar:'بيبسي',en:'Pepsi',arDesc:'كولا كلاسيكية',enDesc:'Classic cola',price:3,cat:'drinks',tag:'COLD',image:'/assets/menu/pepsi.webp'}];
+{id:'kinza-lemon',ar:'كينزا ليمون',en:'Kinza Lemon',arDesc:'مشروب غازي بنكهة الليمون',enDesc:'Lemon flavoured soft drink',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/kinza-lemon.webp'},
+{id:'kinza-orange',ar:'كينزا برتقال',en:'Kinza Orange',arDesc:'مشروب غازي بنكهة البرتقال',enDesc:'Orange flavoured soft drink',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/kinza-orange.webp'},
+{id:'kinza-cola',ar:'كينزا كولا',en:'Kinza Cola',arDesc:'مشروب غازي كولا',enDesc:'Cola soft drink',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/kinza-cola.webp'},
+{id:'mirinda',ar:'ميرندا',en:'Mirinda',arDesc:'مشروب غازي بنكهة البرتقال',enDesc:'Orange soft drink',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/mirinda.webp'},
+{id:'mountain-dew',ar:'ماونتن ديو',en:'Mountain Dew',arDesc:'مشروب غازي منعش',enDesc:'Refreshing soft drink',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/mountain-dew.webp'},
+{id:'7up-diet',ar:'سفن أب دايت',en:'7UP Diet',arDesc:'مشروب غازي بدون سكر',enDesc:'Zero sugar soft drink',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/7up-diet.webp'},
+{id:'7up',ar:'سفن أب',en:'7UP',arDesc:'ليمون وليمون أخضر منعش',enDesc:'Refreshing lemon & lime',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/7up.webp'},
+{id:'pepsi-diet',ar:'بيبسي دايت',en:'Pepsi Diet',arDesc:'كولا بدون سكر',enDesc:'Diet cola',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/pepsi-diet.webp'},
+{id:'pepsi',ar:'بيبسي',en:'Pepsi',arDesc:'كولا كلاسيكية',enDesc:'Classic cola',price:5,cat:'drinks',tag:'COLD',image:'/assets/menu/pepsi.webp'}];
 const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
 let lang=afandiLanguageStorage.getItem('affandi-lang-v2')==='en'?'en':'ar',activeCategory='all',cart={};
 const t=k=>I18N[lang][k]||k,money=n=>`AED ${Number(n).toFixed(0)}`,productName=p=>p[lang],productDesc=p=>p[`${lang}Desc`],branchName=b=>b[lang];
