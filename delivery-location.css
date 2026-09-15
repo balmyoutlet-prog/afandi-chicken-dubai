@@ -1,0 +1,34 @@
+/* Scoped to delivery: keep existing Afandi identity and checkout rails intact. */
+.delivery-location{min-width:0;border:1px solid #ecd2d5;border-radius:18px;padding:16px;margin:14px 0;background:#fff8f8;scroll-margin-block:20px 160px}
+.delivery-location[hidden],.delivery-location [hidden]{display:none!important}
+.delivery-location h3{font-size:18px;line-height:1.4;margin:0 0 8px}
+.delivery-location p{margin:8px 0;line-height:1.6}
+.delivery-policy{font-size:13px;font-weight:800;color:#77131e}
+.delivery-note{font-size:12px;color:#535353}
+.delivery-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.delivery-location button{min-height:44px;max-width:100%;border:1px solid #ded5d5;border-radius:12px;background:#fff;color:#121212;padding:9px 13px;font-weight:800;font-size:13px;white-space:normal}
+.delivery-location #deliveryUseGPS,.delivery-location #deliveryConfirmLocation{background:var(--red);color:#fff;border-color:var(--red)}
+.delivery-location button:disabled{opacity:.55;cursor:not-allowed}
+.delivery-location button:focus-visible,.delivery-location input:focus-visible,.delivery-location summary:focus-visible{outline:3px solid #1a557c;outline-offset:3px}
+.delivery-location details{margin:10px 0}
+.delivery-location summary{cursor:pointer;font-size:13px;font-weight:800;padding:8px 0;min-height:44px}
+.delivery-location label{font-size:12px;margin:6px 0!important}
+.delivery-location input{min-width:0;max-width:100%;width:100%;font-size:14px;margin-bottom:8px}
+.delivery-message{font-size:13px;color:#8b1422;font-weight:700}
+.delivery-message:empty{display:none}
+.delivery-location #deliveryCandidate{background:#fff;border:1px solid #e8dede;border-radius:12px;padding:12px}
+.delivery-location #deliveryCandidate a{color:#8b1422;font-size:13px;font-weight:800}
+.delivery-location #deliveryPointText{font-size:12px;overflow-wrap:anywhere}
+.delivery-location #deliveryCandidate button{margin-top:5px}
+.delivery-quote{font-size:13px;font-weight:800;overflow-wrap:anywhere}
+.delivery-location #deliveryNearestBranch{background:#fff4d7;color:#542c00;border-color:#e9d293}
+#deliveryMapWrap{margin-top:12px}
+#deliveryMapWrap>p{font-size:12px}
+#deliveryMap{height:270px;width:100%;border-radius:12px;border:1px solid #b8b8b8;direction:ltr;position:relative;isolation:isolate;background:#ececec}
+#deliveryMap .leaflet-control-attribution{font-size:10px;line-height:1.35;background:rgba(255,255,255,.95)}
+#deliveryMap .leaflet-control-attribution a{color:#16446b}
+#deliveryMap .leaflet-control-zoom a{width:36px;height:36px;line-height:36px;color:#121212}
+#deliveryMap .delivery-pin{color:#d50012;font-size:25px;line-height:28px;text-align:center;filter:drop-shadow(0 1px 2px #fff);border:2px solid white;border-radius:50%;background:#fff}
+#deliveryMapCenter{margin-top:8px}
+#checkoutTotal{max-width:70%;text-align:end;overflow-wrap:anywhere}
+@media(max-width:420px){.delivery-location{padding:12px}.delivery-actions{display:grid;grid-template-columns:1fr 1fr}.delivery-location button{padding:8px;font-size:12px}.delivery-location h3{font-size:16px}#deliveryMap{height:240px}}
