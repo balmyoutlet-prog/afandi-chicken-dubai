@@ -145,7 +145,7 @@
     }).join('\n');
     const addressLine = mode === 'Delivery' ? `\n${t('address')}: ${address}` : '';
     const feeLine = mode === 'Delivery' ? `\n${t('deliveryFee')}: ${money(deliveryFee())}` : '';
-    const message = `${t('newOrder')}\n\n${t('branch')}: ${branchName(branch)}\n${t('customer')}: ${name}\n${t('phone')}: ${phone}\n${t('receipt')}: ${mode}${addressLine}\n${t('payMethod')}: WhatsApp / COD\n\n${lines}${feeLine}${mode === 'Delivery' ? window.AfandiDeliveryUI.whatsappLines() : ''}\n\n${t('orderTotal')}: ${money(orderTotal())}`;
+    const message = `${t('newOrder')}\n\n${t('branch')}: ${branchName(branch)}\n${t('customer')}: ${name}\n${t('phone')}: ${phone}\n${t('receipt')}: ${mode}${addressLine}\n${t('payMethod')}: WhatsApp / COD\n\n${lines}\n\n${t('subtotal')}: ${money(totals())}${feeLine}${mode === 'Delivery' ? window.AfandiDeliveryUI.whatsappLines() : ''}\n\n${t('orderTotal')}: ${money(orderTotal())}`;
     saveCart();
     window.location.href = `https://wa.me/${branch.phone}?text=${encodeURIComponent(message)}`;
   };

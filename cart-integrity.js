@@ -32,6 +32,7 @@
   const style = document.createElement('style');
   style.id = 'afandi-cart-integrity-style';
   style.textContent = `
+    #cartDrawer.open ~ #stickyBar {display:none!important;pointer-events:none}
     #qvUpsell {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;align-items:stretch}
     #qvUpsell .qv-product-card {min-width:0;display:flex;flex-direction:column;align-items:center;gap:7px;padding:10px 8px;background:#fff;border:1px solid #e5e1dc;border-radius:14px;text-align:center;color:#171717}
     #qvUpsell .qv-product-card img {width:100%;height:76px;object-fit:contain}
@@ -81,16 +82,23 @@
     const nonempty = Object.keys(cart).length > 0;
     const fee = chargedFee();
     const delivery = selectedMode() === 'Delivery' && nonempty;
+    const pending = delivery && (fee === null || !Number.isFinite(Number(fee)));
+    const totalText = pending ? money(totals()) + text(' + التوصيل', ' + delivery') : money(orderTotal());
+    const feeText = pending ? text('بعد تحديد الموقع', 'After choosing location') : money(fee);
     document.getElementById('checkoutSubtotal').textContent = money(totals());
-    document.getElementById('checkoutTotal').textContent = money(orderTotal());
+    document.getElementById('checkoutTotal').textContent = totalText;
     document.getElementById('cartTotal').textContent = money(totals());
-    document.getElementById('cartDeliveryFee').textContent = money(fee);
-    document.getElementById('cartGrandTotal').textContent = money(orderTotal());
+    document.getElementById('cartDeliveryFee').textContent = feeText;
+    document.getElementById('cartGrandTotal').textContent = totalText;
     drawerFees.hidden = !delivery;
     drawerGrand.hidden = !nonempty || !selectedMode();
-    if (feeRow) { feeRow.hidden = !delivery; feeRow.querySelector('strong').textContent = money(fee); }
+    if (feeRow) { feeRow.hidden = !delivery; feeRow.querySelector('strong').textContent = feeText; }
     for (const row of [subtotalRow, cartTotalRow, drawerFees, drawerGrand, checkoutSummary]) {
       const label = row.querySelector('[data-i18n]'); if (label) label.textContent = t(label.dataset.i18n);
+    }
+    if (pending) {
+      checkoutSummary.querySelector('span').textContent = text('المجموع الفرعي + التوصيل', 'Subtotal + delivery');
+      drawerGrand.querySelector('span').textContent = text('المجموع الفرعي + التوصيل', 'Subtotal + delivery');
     }
     for (const count of document.querySelectorAll('[data-qv-count]')) {
       const qty = cart[count.dataset.qvCount] || 0;
@@ -194,6 +202,11 @@
       qvStatus.textContent=''; renderQuickSuggestions();
     }
   };
+  // Quote-detail changes cover branch, GPS, manual pin, confirmation and clearing.
+  // syncSummary never writes quote-detail, so this observer cannot loop.
+  const quoteDetail = document.getElementById('deliveryQuoteDetail');
+  if (quoteDetail) new MutationObserver(syncSummary).observe(quoteDetail, {childList:true,subtree:true});
+  document.getElementById('branchSelect').addEventListener('change',syncSummary);
   renderCart();
   document.documentElement.dataset.cartIntegrity='20260915r1';
 })();

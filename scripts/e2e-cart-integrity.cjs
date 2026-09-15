@@ -1,3 +1,6 @@
+// Font downloads must not block screenshots; browser interaction checks still use the real page.
+process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY='1';
+const setDeliveryLocation=require('./delivery-test-helper.cjs');
 const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
@@ -23,12 +26,12 @@ async function audit(type,viewport,label){
   assert.equal(new Set(catalog.map(p=>p.id)).size,catalog.length,'Unique catalog IDs');
   let quickViews=0,recommendationClicks=0,mainAdds=0;
   async function checkTotals(note){
-   const state=await page.evaluate(()=>({cart:{...cart},subtotal:totals(),total:orderTotal(),fee:Object.keys(cart).length&&selectedMode()==='Delivery'?deliveryFee():0,cartText:document.getElementById('cartTotal').textContent,checkoutSubtotal:document.getElementById('checkoutSubtotal').textContent,checkoutText:document.getElementById('checkoutTotal').textContent,sticky:document.getElementById('stickyTotal').textContent,count:Number(document.getElementById('cartCount').textContent),navCount:Number(document.getElementById('navCartCount').textContent),stickyCount:Number(document.getElementById('stickyCount').textContent)}));
+   const state=await page.evaluate(()=>({language:lang,pending:Object.keys(cart).length>0&&selectedMode()==='Delivery'&&deliveryFee()===null,cart:{...cart},subtotal:totals(),total:orderTotal(),fee:Object.keys(cart).length&&selectedMode()==='Delivery'?deliveryFee():0,cartText:document.getElementById('cartTotal').textContent,checkoutSubtotal:document.getElementById('checkoutSubtotal').textContent,checkoutText:document.getElementById('checkoutTotal').textContent,sticky:document.getElementById('stickyTotal').textContent,count:Number(document.getElementById('cartCount').textContent),navCount:Number(document.getElementById('navCartCount').textContent),stickyCount:Number(document.getElementById('stickyCount').textContent)}));
    const subtotalCents=Object.entries(state.cart).reduce((sum,[id,q])=>sum+Math.round(catalog.find(p=>p.id===id).price*100)*q,0);
    const expected=subtotalCents/100,total=(subtotalCents+Math.round(state.fee*100))/100,count=Object.values(state.cart).reduce((s,q)=>s+q,0);
    assert.equal(state.subtotal,expected,note+' subtotal');assert.equal(state.total,total,note+' total');
    assert.equal(state.cartText,fmt(expected),note+' cart displayed');assert.equal(state.checkoutSubtotal,fmt(expected),note+' checkout subtotal');
-   assert.equal(state.checkoutText,fmt(total),note+' checkout total');assert.equal(state.sticky,fmt(expected),note+' sticky');
+   assert.equal(state.checkoutText,state.pending?fmt(expected)+(state.language==='ar'?' + التوصيل':' + delivery'):fmt(total),note+' checkout total');assert.equal(state.sticky,fmt(expected),note+' sticky');
    assert.equal(state.count,count);assert.equal(state.navCount,count);assert.equal(state.stickyCount,count);
    return state;
   }
@@ -110,15 +113,25 @@ async function audit(type,viewport,label){
   await page.locator('#customerName').fill('TEST ONLY DO NOT PREPARE');await page.locator('#customerPhone').fill('0500000000');
   const branchList=await page.evaluate(()=>branches.map(b=>({id:b.id,phone:b.phone})));
   let observedDeliveryFee;
+  await page.locator('#branchSelect').selectOption('dubai');
+  await page.locator('[name=mode][value=Delivery]').check();
+  await page.locator('#deliveryAddress').fill('TEST ONLY - no actual delivery');
+  const pendingState=await checkTotals('unconfirmed location');
+  assert.equal(pendingState.pending,true,'Unconfirmed delivery is not shown as free');
+  const pendingHandoffs=handoffs.length;
+  await page.locator('#checkoutForm button[type=submit]').click();
+  assert.equal(handoffs.length,pendingHandoffs,'Missing pin blocks order handoff');
+  await setDeliveryLocation(page,'dubai');
   for(const language of ['en','ar']){
    await page.evaluate(l=>applyLanguage(l,true),language);
    for(const mode of ['Delivery','Takeaway','Dine-in']){
     await page.locator('[name=mode][value="'+mode+'"]').check();
     if(mode==='Delivery')await page.locator('#deliveryAddress').fill('TEST ONLY - no actual delivery');
-    const state=await checkTotals(language+' '+mode);
+    let state=await checkTotals(language+' '+mode);
     if(mode==='Delivery')observedDeliveryFee=state.fee;else assert.equal(state.fee,0);
     for(const b of branchList){
      await page.locator('#branchSelect').selectOption(b.id);
+     state=await checkTotals(language+' '+mode+' '+b.id);
      const before=handoffs.length;
      await page.locator('#checkoutForm button[type=submit]').click();
      await page.waitForTimeout(100);
@@ -131,6 +144,19 @@ async function audit(type,viewport,label){
     }
    }
   }
+  // Exercise the full radius bands using synthetic customer pins, never real orders.
+  await page.locator('[name=mode][value=Delivery]').check();
+  await page.locator('#branchSelect').selectOption('dubai');
+  const origin=await page.evaluate(()=>AfandiDeliveryPricing.branchPins.dubai);
+  for(const [km,fee] of [[2,5],[7,10],[12,15],[20,15]]){
+   if(!(await page.locator('#deliveryManual').evaluate(e=>e.open)))await page.locator('#deliveryManual summary').click();
+   await page.locator('#deliveryCoordinates').fill((origin.lat+km/111.195)+','+origin.lng);
+   await page.locator('#deliveryApplyCoordinates').click();
+   await page.locator('#deliveryConfirmLocation').click();
+   const band=await checkTotals('radius '+km+' km');
+   assert.equal(band.fee,fee);assert.equal(band.total,band.subtotal+fee);
+   assert.equal(await page.locator('#cartGrandTotal').textContent(),fmt(band.total),'Drawer updates after pin changes');
+  }
   // Checkout add-ons must not submit, lose details, or hide checkout behind the cart.
   await page.locator('[name=mode][value=Delivery]').check();
   await page.locator('#deliveryAddress').fill('TEST ONLY - retained address');
@@ -141,7 +167,7 @@ async function audit(type,viewport,label){
   assert.equal((await checkTotals('checkout add')).subtotal,subBefore+catalog.find(p=>p.id==='water').price);
   assert.equal(handoffs.length,beforeHandoffs);assert(await page.locator('#checkoutDialog').evaluate(e=>e.open));
   assert.equal(await page.locator('#deliveryAddress').inputValue(),'TEST ONLY - retained address');
-  await page.locator('[data-merch-view=fish]').first().click();
+  await page.locator('[data-merch-view=water]').first().click();
   const nestedButton=page.locator('#qvUpsell [data-qvadd]').first();await nestedButton.click();
   await page.locator('#qvAdd').click();
   assert(await page.locator('#checkoutDialog').evaluate(e=>e.open));assert.equal(await page.locator('#cartDrawer').getAttribute('aria-hidden'),'true');
@@ -151,7 +177,7 @@ async function audit(type,viewport,label){
   await page.evaluate(()=>{cart={};renderCart()});
   const empty=await checkTotals('empty delivery cart');assert.equal(empty.total,0);assert.equal(empty.fee,0);
   assert.equal(errors.length,0,errors.join('; '));
-  report.tests.push({label,pass:true,languages:['ar','en'],catalogProducts:catalog.length,quickViews,recommendationClicks,mainAdds,menuButtons:catalog.length,observedDeliveryFee,interceptedHandoffs:handoffs.length,realMessagesSent:0,checks:'Explicit + Add on all QV recommendations; correct item and quantity; parent preserved; rapid repeats; main x2; every menu add; plus/minus/remove; canonical prices; subtotal/grand total/sticky/counts; decimal rounding; invalid and stale cart; refresh persistence; all three order modes; all branch WhatsApp receipts intercepted; checkout nested QV; no auto-submission; empty cart zero; no horizontal overflow or JavaScript errors'});
+  report.tests.push({label,pass:true,languages:['ar','en'],catalogProducts:catalog.length,quickViews,recommendationClicks,mainAdds,menuButtons:catalog.length,observedDeliveryFee,verifiedFeeBands:[5,10,15],pendingLocationBlocksSubmit:true,interceptedHandoffs:handoffs.length,realMessagesSent:0,checks:'Explicit + Add on all QV recommendations; correct item and quantity; parent preserved; rapid repeats; main x2; every menu add; plus/minus/remove; canonical prices; subtotal/grand total/sticky/counts; decimal rounding; invalid and stale cart; refresh persistence; all three order modes; all branch WhatsApp receipts intercepted; checkout nested QV; no auto-submission; empty cart zero; no horizontal overflow or JavaScript errors'});
  }catch(error){if(page)await page.screenshot({path:'audit-results/'+label+'-failure.png'}).catch(()=>{});throw error}finally{await browser.close()}
 }
 (async()=>{
