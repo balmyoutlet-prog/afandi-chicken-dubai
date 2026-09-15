@@ -1,6 +1,21 @@
 /* Afandi Dubai checkout reliability. No prices, branch numbers or payment services changed. */
 (function () {
   'use strict';
+  // Keep each transparent native radio inside its own visible option card.
+  // Previously width:100% plus absolute positioning made Takeaway cover Delivery.
+  const checkoutStyle = document.createElement('style');
+  checkoutStyle.textContent = `
+    #checkoutForm .mode-grid > label, #checkoutForm .payment-grid > label { position: relative; }
+    #checkoutForm .mode-grid input[type="radio"], #checkoutForm .payment-grid input[type="radio"] {
+      position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0;
+      opacity: 0; z-index: 1; cursor: pointer;
+    }
+    #checkoutForm input[type="radio"]:disabled { cursor: not-allowed; }
+    #checkoutForm input[type="radio"]:focus-visible + span { outline: 3px solid var(--red); outline-offset: 3px; }
+    .checkout-return-actions button { min-height: 44px; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .orbit { animation: none; } }
+  `;
+  document.head.appendChild(checkoutStyle);
   const storageKey = 'afandi-cart-v1';
   const arabic = () => lang === 'ar';
   const copy = (ar, en) => arabic() ? ar : en;
@@ -92,6 +107,7 @@
   for (const field of [$('#customerName'), $('#customerPhone'), $('#deliveryAddress')]) {
     field.addEventListener('input', () => field.setCustomValidity(''));
   }
+  document.querySelectorAll('[name="mode"]').forEach(input => input.addEventListener('change', () => $('#deliveryAddress').setCustomValidity('')));
   function invalid(field, message) {
     field.setCustomValidity(message);
     field.reportValidity();
@@ -107,7 +123,7 @@
     if (!branch || !/^\d{8,15}$/.test(branch.phone)) { showToast(t('chooseBranch')); return; }
     const name = $('#customerName').value.trim();
     const phone = $('#customerPhone').value.trim();
-    const phoneDigits = phone.replace(/[\s()+.\-]/g, '');
+    const phoneDigits = phone.replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632)).replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776)).replace(/[\s()+.\-]/g, '');
     const mode = selectedMode();
     const address = $('#deliveryAddress').value.trim();
     if (name.length < 2) return invalid($('#customerName'), copy('اكتب الاسم بشكل صحيح', 'Enter your name'));
