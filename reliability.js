@@ -16,6 +16,14 @@
     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .orbit { animation: none; } }
   `;
   document.head.appendChild(checkoutStyle);
+
+  // aria-hidden alone does not remove the cart drawer's buttons from keyboard focus.
+  // Mirror its visible state to inert so hidden controls cannot trap tab/focus.
+  const cartDrawer = $('#cartDrawer');
+  const syncCartInert = () => { cartDrawer.inert = cartDrawer.getAttribute('aria-hidden') !== 'false'; };
+  syncCartInert();
+  new MutationObserver(syncCartInert).observe(cartDrawer, { attributes: true, attributeFilter: ['aria-hidden'] });
+
   const storageKey = 'afandi-cart-v1';
   const arabic = () => lang === 'ar';
   const copy = (ar, en) => arabic() ? ar : en;
