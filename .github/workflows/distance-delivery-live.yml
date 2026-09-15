@@ -1,0 +1,102 @@
+name: Confirmed-location delivery verification
+on:
+  push:
+    branches: [feat/delivery-live-20260915, main]
+    paths: ['delivery-*.js', 'delivery-*.css', 'scripts/*delivery*', '.github/workflows/distance-delivery-live.yml', 'app.js', 'index.html', 'reliability.js', 'checkout-rails.js', 'vercel.json']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: confirmed-delivery-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - name: Install isolated test tools and pinned open-source map library
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2 leaflet@1.9.4
+          npx playwright install --with-deps chromium webkit
+      - name: Prepare scoped integration on the feature branch only
+        if: github.ref_name == 'feat/delivery-live-20260915'
+        run: python scripts/prepare-distance-delivery.py
+      - name: Unit checks and all local customer journeys
+        run: |
+          mkdir -p audit-results
+          node --check delivery-pricing.js
+          node --check delivery-location.js
+          node --check app.js
+          node --check reliability.js
+          node --check checkout-rails.js
+          node --test scripts/test-delivery-pricing.cjs | tee audit-results/delivery-unit-tests.txt
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/delivery-server.log 2>&1 &
+          node scripts/e2e-distance-delivery.cjs
+          node scripts/e2e-reliability.cjs
+          node scripts/e2e-checkout-rails.cjs
+      - name: Save tested integration to feature branch, never directly to production
+        if: github.ref_name == 'feat/delivery-live-20260915'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js index.html reliability.js checkout-rails.js delivery-location.js vercel.json assets/vendor scripts/e2e-reliability.cjs scripts/e2e-checkout-rails.cjs .github/workflows/checkout-merchandising.yml
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat: activate browser-verified 5/10/15 AED delivery using all confirmed branch pins'
+            git push origin HEAD:feat/delivery-live-20260915
+          fi
+      - name: Wait for exact live delivery release and same-origin location permission
+        if: github.ref_name == 'main'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from urllib.request import urlopen
+          import hashlib,time,json
+          files=['app.js','reliability.js','delivery-pricing.js','delivery-location.js','checkout-rails.js']
+          hashes={f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in files}
+          for attempt in range(40):
+              try:
+                  with urlopen('https://alafandichicken.com',timeout=15) as r:
+                      ready='delivery-location.js?v=20260915d1' in r.read().decode() and 'geolocation=(self)' in r.headers.get('Permissions-Policy','')
+                      headers=dict(r.headers)
+                  if ready:
+                      for f in files:
+                          with urlopen('https://alafandichicken.com/'+f,timeout=15) as r:
+                              ready=ready and hashlib.sha256(r.read()).hexdigest()==hashes[f]
+                  if ready:break
+              except Exception:pass
+              time.sleep(3)
+          else:raise SystemExit('Expected delivery release is not visible; do not report published')
+          Path('audit-results/live-delivery-release.json').write_text(json.dumps({'verified':True,'files_sha256':hashes,'headers':headers,'dns_email_billing_changed':False},indent=2))
+          PY
+      - name: Real public domain customer journey with synthetic locations and no sent messages
+        if: github.ref_name == 'main'
+        env:
+          AUDIT_BASE: https://alafandichicken.com
+        run: |
+          node scripts/e2e-distance-delivery.cjs
+          node scripts/e2e-reliability.cjs
+          node scripts/e2e-checkout-rails.cjs
+      - name: Save exact audited source and results for review
+        if: always()
+        run: |
+          mkdir -p audit-results
+          python - <<'PY'
+          import zipfile
+          from pathlib import Path
+          with zipfile.ZipFile('audit-results/delivery-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in Path('.').iterdir():
+                  if p.is_file() and p.name not in ['package.json','package-lock.json']:z.write(p)
+              for folder in ['scripts','.github/workflows','assets/vendor']:
+                  for p in Path(folder).rglob('*'):
+                      if p.is_file():z.write(p)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: confirmed-delivery-${{ github.run_id }}
+          path: audit-results/
+          retention-days: 7
