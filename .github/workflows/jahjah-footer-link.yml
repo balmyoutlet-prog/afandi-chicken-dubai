@@ -1,0 +1,38 @@
+name: Jahjah footer production link
+on:
+  push:
+    paths:
+      - '.github/workflows/jahjah-footer-link.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Add Jahjah WebDigital production attribution
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text()
+          old = '<footer class="social-strip" id="afandiPublicFooter" aria-label="Contact Al Afandi Chicken"><a href="mailto:info@alafandichicken.com" dir="ltr">info@alafandichicken.com</a></footer>'
+          new = '<footer class="social-strip" id="afandiPublicFooter" aria-label="Contact Al Afandi Chicken"><a href="mailto:info@alafandichicken.com" dir="ltr">info@alafandichicken.com</a><a href="https://jahjahwebdigital.com/" target="_blank" rel="noopener noreferrer" dir="ltr">Jahjah WebDigital ↗</a></footer>'
+          if old not in s:
+              if 'https://jahjahwebdigital.com/' in s:
+                  print('Attribution already present')
+              else:
+                  raise SystemExit('Expected footer block not found')
+          else:
+              p.write_text(s.replace(old, new, 1))
+          PY
+          rm -f .github/workflows/jahjah-footer-link.yml
+      - name: Commit production footer link
+        run: |
+          git config user.name 'Jahjah WebDigital Automation'
+          git config user.email 'balmyoutlet@gmail.com'
+          git add index.html .github/workflows/jahjah-footer-link.yml
+          git diff --cached --quiet || git commit -m 'Link Jahjah WebDigital footer to production site'
+          git push origin HEAD:main
