@@ -197,3 +197,10 @@ body{padding-bottom:78px}
 .food-image{aspect-ratio:1.2/1}.menu-card-body h3{font-size:11px}.filters{overflow-x:auto;flex-wrap:nowrap;margin-bottom:7px}.filters button{white-space:nowrap;padding:6px 9px}
 .upsell-rail{gap:5px}.branch-card{padding:9px}.branch-card h3{font-size:12px}
 }
+
+/* Jahjah WebDigital attribution */
+#afandiPublicFooter.studio-credit{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px;padding:16px 18px}
+#afandiPublicFooter .studio-credit-copy{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:7px;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:.02em}
+#afandiPublicFooter .studio-credit-brand{font-weight:800;text-decoration:underline;text-underline-offset:3px}
+#afandiPublicFooter .studio-credit-instagram{opacity:.88;text-decoration:underline;text-underline-offset:3px}
+#afandiPublicFooter .studio-credit-brand:hover,#afandiPublicFooter .studio-credit-instagram:hover{opacity:1}
