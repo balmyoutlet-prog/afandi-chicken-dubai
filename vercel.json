@@ -4,6 +4,19 @@
     "alafandichicken.com",
     "www.alafandichicken.com"
   ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.alafandichicken.com"
+        }
+      ],
+      "destination": "https://alafandichicken.com/:path*",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
