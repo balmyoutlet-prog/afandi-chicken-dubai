@@ -38,25 +38,35 @@ async function run(type,viewport,label){
    }}});
   });
   await openCheckout(page);
+  const branchState=await page.evaluate(()=>({
+   all:branches.map(b=>({id:b.id,phone:b.phone,map:b.map,en:b.en,ar:b.ar,openingSoon:!!b.openingSoon})),
+   active:branches.filter(b=>!b.openingSoon).map(b=>({id:b.id,phone:b.phone,map:b.map,en:b.en,ar:b.ar}))
+  }));
+  assert(branchState.active.length>0,'At least one branch must remain orderable');
+  assert.equal(await page.locator('#branchSelect option').count(),branchState.active.length+1,'Checkout lists only orderable branches');
+  for(const b of branchState.all.filter(b=>b.openingSoon))assert.equal(await page.locator(`#branchSelect option[value="${b.id}"]`).count(),0,`Opening-soon branch ${b.id} must not be orderable`);
+  const primary=branchState.active[0];
+  const activePins=branchState.active.map(b=>P.branchPins[b.id]);
   assert.equal(await page.evaluate(()=>window.__gpsCalls),0,'No automatic location access');
   assert.equal(await page.evaluate(()=>window.AfandiDeliveryUI.getQuote().feeAED),null);
   assert((await page.locator('#checkoutTotal').textContent()).includes('+ delivery'));
-  await page.locator('#branchSelect').selectOption('dubai');
+  await page.locator('#branchSelect').selectOption(primary.id);
   await page.locator('#checkoutForm button[type=submit]').click();
   assert.equal(handoffs.length,0,'Unknown location never sends a fabricated delivery fee');
   await page.locator('#branchSelect').selectOption('');
   await manual(page,P.branchPins.majaz);
-  assert.equal(await page.locator('#branchSelect').inputValue(),'majaz','Nearest auto-selection only when no branch is selected');
+  const nearestActive=P.nearestBranch(P.branchPins.majaz,activePins);
+  assert.equal(await page.locator('#branchSelect').inputValue(),nearestActive.branch.id,'Nearest auto-selection only uses orderable branches');
   assert.equal(await page.locator('#checkoutTotal').textContent(),'AED 40');
   await page.locator('#branchSelect').selectOption('khalifa');
   let q=P.quote({mode:'Delivery',customer:P.branchPins.majaz,branch:P.branchPins.khalifa});
   assert.equal(await page.evaluate(()=>deliveryFee()),q.feeAED,'Selected fulfilling branch determines charge');
   assert.equal(await page.locator('#deliveryNearestBranch').isVisible(),true);
-  await page.locator('#deliveryNearestBranch').click();assert.equal(await page.locator('#branchSelect').inputValue(),'majaz');
+  await page.locator('#deliveryNearestBranch').click();assert.equal(await page.locator('#branchSelect').inputValue(),nearestActive.branch.id);
   const tiers=[];
-  await page.locator('#branchSelect').selectOption('dubai');
+  await page.locator('#branchSelect').selectOption(primary.id);
   for(const [km,fee] of [[0,5],[4.99,5],[5.01,10],[9.99,10],[10.01,15],[14.99,15],[15.01,15],[20,15]]){
-   const point={lat:P.branchPins.dubai.lat+km/111.1950802335,lng:P.branchPins.dubai.lng};
+   const point={lat:P.branchPins[primary.id].lat+km/111.1950802335,lng:P.branchPins[primary.id].lng};
    await manual(page,point);
    assert.equal(await page.evaluate(()=>deliveryFee()),fee);
    assert.equal(await page.locator('#checkoutTotal').textContent(),'AED '+(35+fee));
@@ -67,16 +77,16 @@ async function run(type,viewport,label){
   assert.equal(await page.locator('#checkoutTotal').textContent(),'AED 55');
   assert.equal(handoffs.length,0);
   await page.evaluate(()=>{cart={fish:1};renderCart()});
-  await manual(page,P.branchPins.dubai);
-  const branchList=await page.evaluate(()=>branches.map(b=>({id:b.id,phone:b.phone,map:b.map,en:b.en,ar:b.ar})));
-  assert.deepEqual(Object.fromEntries(branchList.map(b=>[b.id,b.phone])),phones,'No owner phone number changed');
+  await manual(page,P.branchPins[primary.id]);
+  const branchList=branchState.active;
+  assert.deepEqual(Object.fromEntries(branchState.all.map(b=>[b.id,b.phone])),phones,'No owner phone number changed');
   for(const language of ['en','ar']){
    await page.evaluate(l=>applyLanguage(l,true),language);
    for(const b of branchList){
     await page.locator('#branchSelect').selectOption(b.id);
     for(const mode of ['Delivery','Takeaway','Dine-in']){
      await page.locator(`[name=mode][value="${mode}"]`).check();
-     const expected=P.quote({mode,customer:P.branchPins.dubai,branch:P.branchPins[b.id]});
+     const expected=P.quote({mode,customer:P.branchPins[primary.id],branch:P.branchPins[b.id]});
      assert.equal(await page.locator('#checkoutTotal').textContent(),'AED '+(35+expected.feeAED));
      const count=handoffs.length;
      await page.locator('#checkoutForm button[type=submit]').click();await page.waitForTimeout(100);
@@ -85,7 +95,7 @@ async function run(type,viewport,label){
      assert.equal(url.pathname,'/'+b.phone);assert(message.includes(b[language]));
      assert(message.endsWith('AED '+(35+expected.feeAED)));
      assert.equal(message.includes('https://www.google.com/maps?q='),mode==='Delivery');
-     if(mode==='Delivery')assert(message.includes('25.2155801,55.3171835'));
+     if(mode==='Delivery')assert(message.includes(P.branchPins[primary.id].lat.toFixed(7)+','+P.branchPins[primary.id].lng.toFixed(7)));
     }
    }
   }
@@ -99,7 +109,7 @@ async function run(type,viewport,label){
   await page.locator('[name=mode][value=Delivery]').check();
   await page.evaluate(()=>window.__gpsMode='denied');await page.locator('#deliveryUseGPS').click();await page.waitForTimeout(40);
   assert((await page.locator('#deliveryLocationMessage').textContent()).includes('denied'));
-  await manual(page,P.branchPins.dubai);assert.equal(await page.evaluate(()=>window.AfandiDeliveryUI.getQuote().status),'ready');
+  await manual(page,P.branchPins[primary.id]);assert.equal(await page.evaluate(()=>window.AfandiDeliveryUI.getQuote().status),'ready');
   await page.evaluate(()=>{window.__gpsMode='success';window.__gpsPoint.accuracy=5000});await page.locator('#deliveryUseGPS').click();await page.waitForTimeout(40);
   assert(await page.locator('#deliveryConfirmLocation').isDisabled());
   await page.evaluate(()=>window.__gpsPoint.accuracy=8);await page.locator('#deliveryUseGPS').click();await page.waitForTimeout(40);
@@ -135,7 +145,7 @@ async function run(type,viewport,label){
    await actual.close();
   }
   assert.equal(errors.length,0,JSON.stringify(errors));
-  report.browsers.push({label,pass:true,tiers,whatsappBranchCases:30,realMessagesSent:0,checks:['No GPS on load','Unknown location blocks delivery','Nearest branch auto-select/recommendation','Fee recalculates for fulfilling branch','Distance tiers and cap','Upsell totals','Arabic/English','All five original phones','WhatsApp includes point only for delivery','Pickup/dine-in zero fee','GPS denied fallback','Low GPS accuracy guarded','Explicit delivery-pin confirmation','Late GPS callback ignored','No overflow','No uncaught JS errors']});
+  report.browsers.push({label,pass:true,tiers,whatsappBranchCases:branchList.length*3*2,realMessagesSent:0,checks:['No GPS on load','Opening-soon branches excluded from checkout','Nearest branch auto-select/recommendation only uses orderable branches','Fee recalculates for fulfilling branch','Distance tiers and cap','Upsell totals','Arabic/English','All five original phones preserved','WhatsApp includes point only for delivery','Pickup/dine-in zero fee','GPS denied fallback','Low GPS accuracy guarded','Explicit delivery-pin confirmation','Late GPS callback ignored','No overflow','No uncaught JS errors']});
  }finally{await browser.close()}
 }
 (async()=>{
