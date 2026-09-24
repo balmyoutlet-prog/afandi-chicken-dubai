@@ -1,0 +1,52 @@
+name: One-time opening-soon orderability repair
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/opening-soon-orderability-repair.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Confirm intended owner branch-status change
+        run: |
+          grep -q "openingSoon:true" app.js
+          grep -q "branches.filter(b=>!b.openingSoon)" app.js
+      - name: Apply scoped repair patch
+        env:
+          REPAIR_PATCH_GZ_B64: "H4sICKHvtGoCA29wZW5pbmctc29vbi5wYXRjaADtPGtv3Ehy3/dXtJ2DSe5wqBnJY0mjUF6tLS/2TraUldeLgyCce8ieGa44JM2HZa08QO52L5dcgnwKkB9wCHJIkASLIAjyNfkT0tf8klT1g48ZcjRjy3sbJMaeho/u6qrqqup68drtNqFrLvO91yy+aPuhQ1MvDKyvk49arRYZ1L/65BPS7m2YD0gL/m6RTz75iBDCfF1To/dcN2ZJ8lVMI82w6DBlsR7RgPnGDg4dZoGDsEgUekF64AVnOr8yLmOWZnFAtHGaRkl/be38/NwaheHIZ5YTTtYmNEoevrK1Fh9u+TS10vCJ94a5+qbR0sz8RTAqvdiZzi/6JIz/JAtTpudrOmEw9OIJc+/dc2jgei5N2cNLWKKf3+KCJsAuPwlG036Q+T4s0iotEsYui+nAZ5/GNHDGR16QFEsN+DOWWEPPR9YM7N07AyuMWOAFo+MwDAwLKMXHR9Ygn38ysDz31FCTPg1Dn9HAmFk4YBRYnx5W15/h75Elh5XfmrU4z3JvxNIZxh1Zr/iDy0nosn7CfOakzH0KN7phOlmShhMW92e4bgq6+hUCUYTE7TGHArLzmvoZO53OYpGGKfUP6ABm5HhUV7ZtW3ssxVG7d69A20pSmmbJHXgfM+peaA8nYcAudA4SCW6lb1JdIy1y9ffX3139w/WfX/3b9W+vvwPpgmdKwjWjL6Zxpj3HufO8itkQmDwGFLnKbPbMTdLa3IS/QmXwH4hdkpIBCJT9yhoytrf/GFDvPeRIXP0TrP8XpEeuv73+NSCQRUA53J5NYP3S8G5Hjv/d9bdX/3j1Pbn+9fWfwbirv7v+DuZ3OwpACLjDcwACzziUmnly+NVfEaAdefCv17+6/iXpArx/ufr++jcFJA7EJA6NIuYSmhJAB8ZpQs3JjFXgG/CYpdTzYWdT9iZ9FAYpC1KbI8HXvv7l1fdX/0FggSdxOCGa0RIC8YxOmC4uQdHJf/470VqvLNeDzQwc9rNJru7rav+QBALs+xWg/Nur3wMhf4lbeDYhgG0cvrG0HBByX12LXVW8VYRMmZ+wJYlRIx6msZ4blYeaMw7DRKqW1pe3T7w4ATHva9rOR+1CHKR22sX0WY3NLZAhrA/agObZDUZhDkhZIrM0DQO7TPKzMgb5HouB1thzXRbYd9Tgt2/vyFXfvpUXc5pXvBE7C/YNhLnJCsj1vKF+p7KmcSkxtkt2NXDRfA4ExLlVjB0JYU4Iubz/DoXm6vdCfb7tozT+PMxixVhpv/uz0qkk77//9G/Adlz9MwjfX6NO/QaBCsFGCcTXYvdJOvYSCU3LcYINoQlT2M4jD0YGrUm3y81Jt1vYk/JmPRKbfyCPbWBiGDi+55zZYBt3Lwte5kLw9m1xrHmTKGaOlzBDGNdCNIRE2WkMGzKBM56O2M/YhZ0LMIJs2kG1U4HdLM47ACCQkmLnkmJcNsG0gxJnagaBiYho6oz3X8Me6wE7J+IKFJAGI6aZl4NsACqR9JGkKdrwqVCm5Si5UbV+FATx3cuPI76b0505kQF/Im4SGC8A7DhFMD+nzuZ2oyp3cCJ6AbxLcopAOJqHgKg/4k7CC4TvpRe6pnGmTWh8xmLjUvxaMZvAmQOLi3ux8rSgqbzClwn77OgYgA9DcEDgJRDb5q5u4sRelCZrbJ21YxhNB54Pa1pO7vEuGoF6t8EdX/jbVZ4vZy9gkflpYjmgu4kVZYDTJfHRQzEJEJqCtaC+D0dlykZh7LGEAA8JHERu5qQJTA9AgDQ4S8MsgMEwjvrhyPJZMErHJolokvQJ7iiZ4v6hiEqzJ8QD5IsRm9Bz6qUwesQshszH/dINYu8S/VKINQXf5DXrzzuhOKjWDRWziefCJBBKQGYMhyTe8AuT0BhvaGwSFuAVCwBJwxTrleA1LHqLa+KSKPL4CxxjcWqFZ3qJRZYgX/KV7JKOSbS9lIDoAy8BskSRTDLkLSscea0Clb3KwOMrcZvHR2Gsa39U1legXioT31fwe0kzMi3SBWQejZlzFmaAEjg3CaDkXxAni0FAUrjK0clZKfEahjHRyxJBwmFlrTKPiZKFG4h5WUfMiVDquz+5zO3U9O7pyxKJwNOXh2K5dgLrKYzKMwSDg7DK5JeCmGkh3lHsgcJfCLMKAj7PvpPOKZ+0hAaG80iBIrI3jp+54MAO0eV0JP9BF6uqUrNlZp10z7G7SYlbaDfW1shBSF1uDVzmQOxCGJowkgXeKxgoDQEBLoxA7OFdAER9cyEegPfA/PAcHAkGEuC71ke5Ayff15sEmlwEDhGG4bLs9iXg5zh82ollWXi6HLNUx2tlqrh+RjgxsvgasOHwOtfsXH0H5dd7cUwvLGSw7oJNnoA0i9eJSTwc7VkQou2laeyBG8R0LYkdzTBOZ6NdA/YarfCDLbO7TlpbHfwRZvhmzXRoDN4eCGnVY0eR1dalQ9s48fOUTRJygt5Ze+IFcJjfHXrJ+O4pKjeek/oiAFKoPk2D8vB2w/CZI19Etodc++CQywbUU9Zo1dkVdeKecDPOMnRH51bjaQc4YZ/vHz8nh88Ofk7a5PEheXb4nBx9sX+098W+tgSoI7TdOaxOryP/LZh7EsDy9l3MLdw9VaZHBfaC+cjbRcyfyUrV0gL6ADqUeg6hYpQJtqkU7Zf2ChwWtb5ylvSIK2fN1jQPrt8JoYUoWEex5+CJrjwBHtMovXMJuJJEw3FAToRDd5bUASmJPGUxrwcvMYL/yWWBQIv0pi+XkOzjbDTC2EgoCDDRvhuxKPH4Fg0xzNVLgo8qvNUzuxuktb2JPx9chdEeP4LJMxr4Dgq7kgMAk70gytIXKLgcy4qMvB+sG5V5xgWkUeRfHECUkMFLXaPob+JpZNwmZXChliDJuQeRCuDJAPJrOFZUjq4Iej8AG1bF4Bb1JskGPI9YVpsl/BJYNkghyDBz74NkEWAKI5QJEilPE81T2+NHkYjMlUOpSBTBW03A0K4GDAfgXS6MF+YP9Hfwx8X+1qw771KJykDhxfpqC8GPPRGyqrFAOzWUw1KHOj8f5kWdP5aybuaQVQZrgeuM2OKC5YTLejWBK4PrqYgE20vt9xDoLfzP//pb8N9iJt1gkl5E4uEeuMSes7YfjCAUGJOvxjRN9qIISL7wwWVMimhxo1Pe8FxomPtUZGiSFyz2hh6D3RtSzGROjWVdZrE5t4lswVkV+HxMNuB/6+9Aw2oOBx04WvmYHTDYeva5yGyAUI7BCWfu4XAoEbv5eHgSxhOZAT1BVth3wQJMvLTqFc6nHlTiuq3UuyEBUT+OpyG2zPUeacHPRk9J43QqeVJhDT/5JL7c95hXSq6Hdr0tsHdl5oD6fr9qFPAVWARuEIQ9UOYAXsM1/DXBGqAxMME+cPNQDpjuVNMNec5Axl3Ll8lWRqM2VdCcJ9jtmM1JgphNqBfceqKgEZlW16xNEixKDSjzNpsUgD0tcbfKXON9swNziYGO2ZQWuDEjUEkG2M1JADFOPMOaYs3QBbXVhb5ARSfOwRsPz61f/GIUJY+AiwlSpz0LCc3A8FAMJFTFHLBxeNixMvS9IeZZVfzw5edWqYop61MmpkHLkPV3cF/QoeIpkETXyiXOP2SEekNs2mR/hfmdi8nLTEcrHw6HiUrLwL59GZwF4XlQbFmAORjwFQM3IRTOmwHEQhS9xtwdA/4vCjcW8qcycUIDxIoHhWWRBDH9mn5zG565xiFpIJ6yfoUy2hYo8V4FtB7nY/DYIOSVOukVnrJW1kBZ7tjjmjRXxpnH3yxU8TZ8/cryRZ1kMWkZODcN1vEWXH8NPf/7nXcWhrMxeB9DKuf7LCWv7GpLRdHHULRT1HC6pqPCksCnK9geJeFPGDDcMFUl3NSOVeQ0zHz0p8CMK2lxGZwgEy8APjtjGo/Y0rxtqC1bXvLCSzzYLuAwd9ubTVETCGUAbkV5FhizD7t+g8SX3djUY3Fin5z+GKx14WucnE1MEJ1THr+ddMzeqXly39re5hc9q9M1ux242sZH/Krb4Q/xdZcPFJe9/Ol6B39PjUteaZYeAbYV2bxNqyL4nCjs12qdTda63a7V3e51tjrrGxs93sFVNzgYTUUfxULQJwXJp0suUJ3ClyG19l90acm376CswO8bZq9k1bSWvtFrIVCZsnuwaXYf8BYm+Fk6ZXfzQr2etsxBvSi/Ze9eYm7Q5qnLfne6IyqqmPLTjWnZfDQeuFwMxMjZjEVjbPTeAZFIkhRnvMtYtM/JPxx8DXrGayb7QYolY70UOsv1uONqylVOQQT4RcJdUfBowInhD0iQTQZwI3oE3Iq2N/GjLLX1eRy7LovTWoWUIgp5b3oqxqeaPGIBOD801tB0NGWOfHu3mjPyxbljzmSLaoMpniaaT0stZ0IHufEsQ8eTX2BfnP7ac3rGAD5ePobTtu0FOU21C78U1ROEdVoEZngrAzNVOmmXSoDsTcTP+aoX0uB6cJ2pbebkEZXMM70T7LL8LV5B0n97Jk+hqaKsfA1BBY9n7RnztNO8DSvFK6X5eAUznnsThrmbbqdTlE42SWu7V05EVsjPYt+KaDrG7Te1Na0lNUp5I7ps3SoCv8GJEvRTY4al+WAMh77y0rG+iFX1+zG33k0t3oaJklHp4s3lFJuD5l42Eaat96z1bq+3BW5Er2dtdDe7Wxs9zcglcyVoizyB2V70RS5AaWzOMZFJlolk3GbwgTDh3NnO97m5QlrWcUXGgupoYzIDu6dtzWWBx83qQo83b7O6WXbvd5ZIUrgzlVKZ+V2UrlCIrnLA31YKRvT0geGQLX0rn6kfDpFFbtL8bieZyFDtlF8d8S8pqONkMXUubKzVTz+YPCwEO9/K6iWPvQSDeVc3lhftGYq2bpkaXiPaEDWi+yXTLKaBewS7DLDChKkOzDmPl8VxGJcSUz89PnwGuxtDqO0NL+RrKesxi8IY24LDc4CgqjeieMPrKLyMwmND8xyrMeDeiNj0EVZ7+hsdE8TFV9WVY1Ctfsfk5iLpn6C/BdSTEJNi1NVqcmQDuDpLinRhkYSRWYFSLmYtZmDcJ3CAyPqkBhELkOBQ38l87ATlVbi5zAJ3dEQJRIS5vE/KoREixCukoi6awH21AoUP4C2vtIWxN/IC6gvfEcfm5SllSUS0J/JFiEmJqiPY/Sxac4XDRb5hccizf6aGDBIGCEtS/oA6Z/D0IDznrFOCRuBUjV2GPNx/E4EsgTTkn1VFXv7lkeLMAXZyIgBHwiTeKAhjDgC9YJg39MNzcZcFDs1G45T89JgI8dBO8+Le+wnIXJ3u442P11eTmcOV+u2Wl5/Feb0/qHDlrQbu/wUxAyM2ROL9i0th5qS0KTsHJg7+E+2G4ruD+VqoEoB2TD0/aSiE1gxCe7u+ZXZ7pAU/6xvzLpK00k/k91j8QLhzJ+8/fJUBa0RMVtvKZEFE4ozbozjMIk2eM+Ascg1Cb9EZg/yy9iQceFj1k3Y+c7107w0TZ7/QNg2WyyqVZ9nU1ZhWqDZbyrRCxNMK2JUFl/zXBDhwDX9N3kzZly2ZtZ0XyxV5b6n0mtdyy/XeGqirAr21qu0HaO3+QSq2ZXb9aAu04hhpKtMu5Zxy3eNftvDUNnVdfoPHEQtAdjTKHeI+/xokBYw1k5XcvdJ0cfAxy+Uf6xnGor4RVNTPYs8ttTFiPvH/e3x/gB7fFSPY1fp7g1B64Cv29K7S0ruoo5cfIoldS71oKS/OGiRaaQW4GXoAjEnsXf7DLWQgLWTxrSCf/RlONuUXRhelt+qR6blJv9SJH1SPQFyrgg2IP+BicjNdWQk4bUxV4qIwVrAOmiv11YDqXJZnGD+nDNVWoguOWAnIjD6yd0c5lnC04kBTe+olCXpr6gXRWviiHDdKIPyLCQEFSMzN/7175fs/trfu3VO48RegN943mPgpD1O1jvvY5tfqFYGcoBE7ssCbSx+NQziAEzsHKDAZgr/5FOhVuBhijR8kPd0m790pUJb294RVrw2Si+jF2Teoge1C3HuWnCo/LOafWpehiP49qVT4uuAXnAXMAgcy9P0DNsxrasuoX76ueINw264Xi44C+2632tvHP+y/j6KytV6K+Susw///C+tVemEKhPESXYL9N2CSsKGXqP5fkPCcUTUgRAuwBMJvWsINLEAx/KYQ+/YbIb1zYryEw/8WYVu+/6A4O6o43nyGkCX6iwB6G9wp7j8923+x/4WMbXnyf36rFm/SYw+taumMEMKOjqGyXdubInHcq0scz1YVep0laq/d8mGWxT63e19+cZAPBM+upldppg6xvdntrW89gH/d7Tqne65sUd1XWcIo2X+ckDAKuntEYzpJMCuqayi+WjlLrFp0lvHeIBJ+Hj7lAVtzD9mK36ZoXaT2fwBafsiIbUcAAA=="
+        run: |
+          printf '%s' "$REPAIR_PATCH_GZ_B64" | base64 -d | gunzip > /tmp/opening-soon.patch
+          git apply --check /tmp/opening-soon.patch
+          git apply /tmp/opening-soon.patch
+      - name: Install isolated browser test dependencies
+        run: |
+          npm install --no-save --package-lock=false playwright@1.55.0 @axe-core/playwright@4.10.2
+          npx playwright install --with-deps chromium webkit
+      - name: Validate locally before creating repair branch
+        run: |
+          node --check delivery-location.js
+          node --check scripts/e2e-reliability.cjs
+          node --check scripts/e2e-distance-delivery.cjs
+          node --check scripts/e2e-checkout-rails.cjs
+          node --test scripts/test-delivery-pricing.cjs
+          python -m http.server 8765 --bind 127.0.0.1 >/tmp/afandi-repair-server.log 2>&1 &
+          node scripts/e2e-distance-delivery.cjs
+          node scripts/e2e-reliability.cjs
+          node scripts/e2e-checkout-rails.cjs
+      - name: Commit verified repair to isolated branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b repair/opening-soon-orderability-20260924
+          git rm .github/workflows/opening-soon-orderability-repair.yml
+          git add delivery-location.js scripts/e2e-reliability.cjs scripts/e2e-distance-delivery.cjs scripts/e2e-checkout-rails.cjs
+          git commit -m 'fix: keep opening-soon branches out of delivery routing'
+          git push origin HEAD:repair/opening-soon-orderability-20260924
