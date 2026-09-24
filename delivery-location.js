@@ -53,6 +53,8 @@
   el('deliveryAddressWrap').after(panel);
   function pointLink(point){return 'https://www.google.com/maps?q='+point.lat.toFixed(7)+','+point.lng.toFixed(7);}
   function pointForQuote(){return confirmed&&candidate?{lat:candidate.lat,lng:candidate.lng}:null;}
+  function orderableBranchPins(){return branches.filter(b=>!b.openingSoon).map(b=>P.branchPins[b.id]).filter(Boolean);}
+  function nearestOrderableBranch(point){return P.nearestBranch(point,orderableBranchPins());}
   function getQuote(){return P.quote({mode:selectedMode(),customer:pointForQuote(),branch:P.branchPins[el('branchSelect').value]});}
   function totalLabel(){return selectedMode()==='Delivery'&&getQuote().status!=='ready'?money(totals())+txt(' + التوصيل',' + delivery'):money(orderTotal());}
   function refresh(){
@@ -75,7 +77,7 @@
       const band=q.feeAED===5?txt('حتى 5 كم','up to 5 km'):q.feeAED===10?txt('أكثر من 5 إلى 10 كم','over 5 to 10 km'):txt('أكثر من 10 كم، والسقف 15 درهم','over 10 km, capped at AED 15');
       el('deliveryQuoteDetail').textContent=txt('من فرع ','From ')+branchName(branch)+' · '+q.distanceKm.toFixed(2)+txt(' كم تقريباً',' km approx.')+' · '+band+' · '+money(q.feeAED);
     }else el('deliveryQuoteDetail').textContent=delivery?tr(confirmed?'chooseBranch':'chooseFirst'):'';
-    const nearest=confirmed?P.nearestBranch(candidate):null;
+    const nearest=confirmed?nearestOrderableBranch(candidate):null;
     const button=el('deliveryNearestBranch');
     button.hidden=!delivery||!nearest||nearest.status!=='ready'||nearest.branch.id===el('branchSelect').value;
     if(!button.hidden){const b=branches.find(b=>b.id===nearest.branch.id);button.textContent=txt('الأقرب إلك: ','Your nearest branch: ')+branchName(b)+txt(' — اختَر هالفرع',' — choose this branch');button.dataset.branch=nearest.branch.id;}
@@ -115,7 +117,7 @@
   el('deliveryConfirmLocation').onclick=()=>{
     if(!candidate||candidate.imprecise)return;
     confirmed=true;messageKey='';
-    if(!el('branchSelect').value){const n=P.nearestBranch(candidate);if(n.status==='ready'){el('branchSelect').value=n.branch.id;el('branchSelect').dispatchEvent(new Event('change',{bubbles:true}));}}
+    if(!el('branchSelect').value){const n=nearestOrderableBranch(candidate);if(n.status==='ready'){el('branchSelect').value=n.branch.id;el('branchSelect').dispatchEvent(new Event('change',{bubbles:true}));}}
     refresh();
   };
   el('deliveryClearLocation').onclick=()=>{invalidate();candidate=null;el('deliveryCoordinates').value='';el('deliveryCoordinates').setCustomValidity('');if(marker){marker.remove();marker=null;}refresh();el('deliveryUseGPS').focus();};

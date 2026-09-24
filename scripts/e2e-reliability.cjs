@@ -33,6 +33,18 @@ async function run(browserType, viewport, label) {
   }
   results.cases.push({ label, test: 'all categories and products render', count: catalog.length, pass: true });
 
+  const branchState = await page.evaluate(() => ({
+    active: branches.filter(b => !b.openingSoon).map(b => ({ id: b.id, phone: b.phone, ar: b.ar, en: b.en })),
+    openingSoon: branches.filter(b => b.openingSoon).map(b => ({ id: b.id, phone: b.phone, ar: b.ar, en: b.en }))
+  }));
+  assert.ok(branchState.active.length > 0, 'At least one branch must be orderable');
+  assert.equal(await page.locator('#branchSelect option').count(), branchState.active.length + 1, 'Checkout lists only currently orderable branches');
+  for (const branch of branchState.openingSoon) {
+    assert.equal(await page.locator(`#branchSelect option[value="${branch.id}"]`).count(), 0, `Opening-soon branch ${branch.id} must not be orderable`);
+  }
+  const primaryBranch = branchState.active[0];
+  results.cases.push({ label, test: 'opening-soon branches excluded from checkout', active: branchState.active.length, openingSoon: branchState.openingSoon.length, pass: true });
+
   // Load and decode every unique catalog image, even lazy images below the fold.
   const images = await page.evaluate(async () => {
     const sources = [...new Set([...products.map(p => p.image), ...branches.map(b => b.image), ...Array.from(document.images, i => i.getAttribute('src'))].filter(Boolean))];
@@ -68,12 +80,12 @@ async function run(browserType, viewport, label) {
   assert.equal(await page.locator('#cartCount').textContent(), '2');
   await page.locator('#cartItems [data-minus="fish"]').click();
   await page.locator('#checkoutBtn').click();
-  await page.locator('#branchSelect').selectOption('dubai');
+  await page.locator('#branchSelect').selectOption(primaryBranch.id);
   await page.locator('#customerName').fill('TEST ONLY - DO NOT PREPARE');
   await page.locator('#customerPhone').fill('0500000000');
   await page.locator('[name="mode"][value="Delivery"]').check();
   await page.locator('#deliveryAddress').fill('TEST ONLY - synthetic address, no delivery');
-  await setDeliveryLocation(page, 'dubai');
+  await setDeliveryLocation(page, primaryBranch.id);
   const fishPrice = catalog.find(p => p.id === 'fish').price;
   assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${fishPrice + 5}`);
   await page.locator('#checkoutSuggest [data-add="pepsi"]').first().click();
@@ -85,13 +97,13 @@ async function run(browserType, viewport, label) {
   assert.equal(await page.locator('#cartCount').textContent(), '2');
   await page.locator('#openCartBtn').click();
   await page.locator('#checkoutBtn').click();
-  assert.equal(await page.locator('#branchSelect').inputValue(), 'dubai');
+  assert.equal(await page.locator('#branchSelect').inputValue(), primaryBranch.id);
   await page.evaluate(() => applyLanguage('ar', true));
-  assert.equal(await page.locator('#branchSelect').inputValue(), 'dubai', 'Language switch preserves selected branch');
+  assert.equal(await page.locator('#branchSelect').inputValue(), primaryBranch.id, 'Language switch preserves selected branch');
   assert.equal(await page.locator('#checkoutTotal').textContent(), `AED ${subtotal + 5}`);
   results.cases.push({ label, test: 'quantity, checkout upsell, delivery total, add-items return, branch preservation', pass: true });
 
-  const branchList = await page.evaluate(() => branches.map(b => ({ id: b.id, phone: b.phone, ar: b.ar, en: b.en })));
+  const branchList = branchState.active;
   for (const language of ['ar', 'en']) {
     await page.evaluate(value => applyLanguage(value, true), language);
     for (const branch of branchList) {
@@ -115,7 +127,7 @@ async function run(browserType, viewport, label) {
       }
     }
   }
-  results.cases.push({ label, test: 'five branches × three order types × Arabic/English WhatsApp payloads', count: 30, pass: true, deliveredMessagesVerified: false });
+  results.cases.push({ label, test: 'active branches × three order types × Arabic/English WhatsApp payloads', count: branchList.length * 3 * 2, pass: true, deliveredMessagesVerified: false });
   await page.locator('#customerPhone').fill('abc');
   const beforeInvalid = handedOff.length;
   await page.locator('#checkoutForm button[type="submit"]').click();

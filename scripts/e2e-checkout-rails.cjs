@@ -28,15 +28,23 @@ async function run(type,viewport,label){
   await page.waitForFunction(()=>!!document.querySelector('#checkoutSuggest .merch-group'));
   if(label==='chrome-mobile')await auditAxe(page,label,'menu');
   const catalog=await page.evaluate(()=>products.map(p=>({id:p.id,price:p.price,cat:p.cat,image:p.image})));
+  const branchState=await page.evaluate(()=>({
+   active:branches.filter(b=>!b.openingSoon).map(b=>({id:b.id,phone:b.phone})),
+   openingSoon:branches.filter(b=>b.openingSoon).map(b=>({id:b.id,phone:b.phone}))
+  }));
+  assert(branchState.active.length>0,'At least one branch must be orderable');
+  assert.equal(await page.locator('#branchSelect option').count(),branchState.active.length+1,'Checkout lists only orderable branches');
+  for(const b of branchState.openingSoon)assert.equal(await page.locator(`#branchSelect option[value="${b.id}"]`).count(),0,`Opening-soon branch ${b.id} must not be orderable`);
+  const primaryBranch=branchState.active[0];
   await page.evaluate(()=>{window.__merchEvents=[];addEventListener('afandi:marketing',e=>window.__merchEvents.push(e.detail))});
   await page.locator('#menuGrid [data-add=fish]').click();
   await page.locator('#checkoutBtn').click();
-  await page.locator('#branchSelect').selectOption('dubai');
+  await page.locator('#branchSelect').selectOption(primaryBranch.id);
   await page.locator('#customerName').fill('TEST ONLY - DO NOT PREPARE');
   await page.locator('#customerPhone').fill('0500000000');
   await page.locator('[name=mode][value=Delivery]').check();
   await page.locator('#deliveryAddress').fill('TEST ONLY - no actual delivery');
-  await setDeliveryLocation(page,'dubai');
+  await setDeliveryLocation(page,primaryBranch.id);
   const groups=await page.locator('[data-merch-group]').evaluateAll(nodes=>nodes.map(n=>({id:n.dataset.merchGroup,category:n.dataset.category,ids:Array.from(n.querySelectorAll('[data-merch-add]'),b=>b.dataset.merchAdd)})));
   for(const cat of new Set(catalog.map(p=>p.cat)))assert(groups.some(g=>g.category===cat),'Missing category '+cat);
   assert(groups.every(g=>g.ids.length>0&&g.ids.length<=8&&new Set(g.ids).size===g.ids.length));
@@ -47,7 +55,7 @@ async function run(type,viewport,label){
   const distinctChoices=new Set(groups.flatMap(g=>g.ids)).size;
   for(const language of ['en','ar']){
    await page.evaluate(l=>applyLanguage(l,true),language);
-   assert.equal(await page.locator('#branchSelect').inputValue(),'dubai');
+   assert.equal(await page.locator('#branchSelect').inputValue(),primaryBranch.id);
    const rail=page.locator('[data-merch-group=drinks] .merch-rail');
    const before=await rail.evaluate(e=>e.scrollLeft);
    await page.locator('[data-merch-group=drinks] [data-rail-direction="1"]').click();
@@ -74,7 +82,7 @@ async function run(type,viewport,label){
    assert.equal(after.qty,before.qty+1,'Exact add quantity '+id);
    assert.equal(after.total,before.total+price,'Exact added price '+id);
    assert.equal(await page.locator('#checkoutTotal').textContent(),'AED '+after.total);
-   assert.equal(await page.locator('#branchSelect').inputValue(),'dubai');
+   assert.equal(await page.locator('#branchSelect').inputValue(),primaryBranch.id);
    assert.equal(await page.locator('#deliveryAddress').inputValue(),'TEST ONLY - no actual delivery');
    assert.equal(handoffs.length,0,'Add-on must NEVER auto-submit '+id);
    assert(await page.locator('#checkoutDialog').evaluate(e=>e.open));
@@ -97,7 +105,7 @@ async function run(type,viewport,label){
   await page.waitForTimeout(150);
   assert.equal(handoffs.length,1);
   const url=new URL(handoffs[0]);
-  assert.equal(url.pathname,'/971528666619');
+  assert.equal(url.pathname,'/'+primaryBranch.phone);
   assert(url.searchParams.get('text').includes('AED 40'));
   await page.locator('#checkoutBackToMenu').click();
   assert.equal(await page.locator('#cartCount').textContent(),'1');
