@@ -62,7 +62,7 @@ jobs:
           for attempt in range(24):
               try:
                   with urlopen('https://alafandichicken.com', timeout=15) as response:
-                      if 'reliability.js?v=20260915' in response.read().decode():
+                      if 'reliability.js?v=20261005a' in response.read().decode():
                           break
               except Exception:
                   pass
