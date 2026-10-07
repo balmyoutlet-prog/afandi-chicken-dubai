@@ -60,7 +60,7 @@ jobs:
           for attempt in range(40):
               try:
                   with urlopen('https://alafandichicken.com',timeout=15) as r:
-                      ready='delivery-location.js?v=20260915d1' in r.read().decode() and 'geolocation=(self)' in r.headers.get('Permissions-Policy','')
+                      ready='delivery-location.js?v=20261005a' in r.read().decode() and 'geolocation=(self)' in r.headers.get('Permissions-Policy','')
                       headers=dict(r.headers)
                   if ready:
                       for f in files:
