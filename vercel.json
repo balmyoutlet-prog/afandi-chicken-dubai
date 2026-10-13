@@ -15,6 +15,16 @@
       ],
       "destination": "https://alafandichicken.com/:path*",
       "permanent": true
+    },
+    {
+      "source": "/admin",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.html",
+      "permanent": false
+    },
+    {
+      "source": "/admin/",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.html",
+      "permanent": false
     }
   ],
   "headers": [

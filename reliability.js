@@ -121,7 +121,7 @@
     field.reportValidity();
     field.focus();
   }
-  submitOrder = function (event) {
+  submitOrder = async function (event) {
     event.preventDefault();
     cart = validCart(cart);
     if (!Object.keys(cart).length) { renderCart(); showToast(t('chooseFirst')); return; }
@@ -146,8 +146,19 @@
     const addressLine = mode === 'Delivery' ? `\n${t('address')}: ${address}` : '';
     const feeLine = mode === 'Delivery' ? `\n${t('deliveryFee')}: ${money(deliveryFee())}` : '';
     const message = `${t('newOrder')}\n\n${t('branch')}: ${branchName(branch)}\n${t('customer')}: ${name}\n${t('phone')}: ${phone}\n${t('receipt')}: ${mode}${addressLine}\n${t('payMethod')}: WhatsApp / COD\n\n${lines}${feeLine}${mode === 'Delivery' ? window.AfandiDeliveryUI.whatsappLines() : ''}\n\n${t('orderTotal')}: ${money(orderTotal())}`;
-    saveCart();
-    window.location.href = `https://wa.me/${branch.phone}?text=${encodeURIComponent(message)}`;
+    if (form.dataset.submitting === '1') return;
+    form.dataset.submitting = '1';
+    const sendButton = form.querySelector('button[type="submit"]');
+    if (sendButton) sendButton.disabled = true;
+    try {
+      const reference = window.AfandiBehavior ? await window.AfandiBehavior.saveOrder({branch:branch.id,name,phone:phoneDigits,mode,items:Object.entries(cart).map(([id,qty])=>({id,qty})),fee:mode==='Delivery'?deliveryFee():0}) : null;
+      const trackedMessage = reference ? message + `\n\n${copy('مرجع الطلب', 'Order reference')}: ${reference}` : message;
+      saveCart();
+      window.location.href = `https://wa.me/${branch.phone}?text=${encodeURIComponent(trackedMessage)}`;
+    } finally {
+      form.dataset.submitting = '0';
+      if (sendButton) sendButton.disabled = false;
+    }
   };
   $('#checkoutForm').onsubmit = submitOrder;
 
