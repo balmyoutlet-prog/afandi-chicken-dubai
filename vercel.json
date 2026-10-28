@@ -15,16 +15,6 @@
       ],
       "destination": "https://alafandichicken.com/:path*",
       "permanent": true
-    },
-    {
-      "source": "/admin",
-      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.html",
-      "permanent": false
-    },
-    {
-      "source": "/admin/",
-      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.html",
-      "permanent": false
     }
   ],
   "headers": [
@@ -75,6 +65,41 @@
           "value": "public, max-age=86400, stale-while-revalidate=604800"
         }
       ]
+    },
+    {
+      "source": "/api/analytics/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin"
+    },
+    {
+      "source": "/admin.html",
+      "destination": "/admin"
+    },
+    {
+      "source": "/admin.js",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.js"
+    },
+    {
+      "source": "/admin.css",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.css"
+    },
+    {
+      "source": "/api/analytics/:path*",
+      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/api/analytics/:path*"
     }
   ]
 }
