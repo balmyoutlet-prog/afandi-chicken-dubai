@@ -6,7 +6,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'POST' && !ORIGINS.has(req.headers.origin)) return res.status(403).json({error:'Forbidden'});
   const url = new URL(req.url, 'https://alafandichicken.com');
   const action = url.searchParams.get('action');
-  if (!['login','logout','dashboard'].includes(action)) return res.status(404).end();
+  if (!['login','logout','dashboard','status','track'].includes(action)) return res.status(404).end();
   url.searchParams.delete('action');
   const headers = {'Content-Type':'application/json'};
   if(req.headers.cookie) headers.Cookie = req.headers.cookie;
