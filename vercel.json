@@ -98,8 +98,8 @@
       "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/admin.css"
     },
     {
-      "source": "/api/analytics/:path*",
-      "destination": "https://affandi-chicken-dubai.suzy-309.chatgpt.site/api/analytics/:path*"
+      "source": "/api/analytics/:action",
+      "destination": "/api/admin-analytics?action=:action"
     }
   ]
 }
